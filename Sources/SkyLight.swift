@@ -63,12 +63,54 @@ enum SkyLight {
         return getActiveSpace?(cid)
     }
 
+    /// Live Accessibility trust state. Queries TCC on every call, so it
+    /// reflects a permission change made in System Settings without restart —
+    /// except in the rare case the app must be relaunched to pick it up.
+    static var isAccessibilityTrusted: Bool {
+        AXIsProcessTrusted()
+    }
+
+    /// Triggers the system's Accessibility authorization dialog
+    /// (System Settings → Privacy & Security → Accessibility). Call this
+    /// when the user attempts a jump while untrusted — macOS pops the
+    /// standard prompt that deep-links into the right settings pane.
+    static func promptForAccessibility() {
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+        _ = AXIsProcessTrustedWithOptions(options)
+    }
+
+    // MARK: - Shortcut enablement detection
+
+    /// Numbers (1-based) whose "Switch to Desktop N" shortcut is enabled,
+    /// read from the same preferences that back System Settings →
+    /// Keyboard → Keyboard Shortcuts → Mission Control. Empty when
+    /// unreadable. Symbolic hotkey IDs: 79=Desktop 1 … 87=Desktop 9.
+    static func enabledDesktopShortcuts() -> Set<Int> {
+        guard let prefs = UserDefaults(suiteName: "com.apple.symbolichotkeys"),
+            let all = prefs.dictionary(forKey: "AppleSymbolicHotKeys")
+        else { return [] }
+        let mapping: [String: Int] = [
+            "79": 1, "80": 2, "81": 3, "82": 4, "83": 5,
+            "84": 6, "85": 7, "86": 8, "87": 9,
+        ]
+        var result = Set<Int>()
+        for (key, desktop) in mapping {
+            guard let entry = all[key] as? [String: Any],
+                let flag = entry["enabled"] as? Bool,
+                flag
+            else { continue }
+            result.insert(desktop)
+        }
+        return result
+    }
+
     // MARK: - Space switching
 
     enum SwitchResult: Equatable {
         case success
         case notFound
         case indexTooHigh(limit: Int)
+        case shortcutNotEnabled(desktop: Int)
         case accessibilityDenied
         case unavailable
     }
@@ -117,10 +159,18 @@ enum SkyLight {
     /// animation, so this is far more robust than any private "move to space"
     /// call — those either don't trigger a real switch or are long gone.
     ///
+    /// The enabled "Switch to Desktop N" set is read from the system shortcut
+    /// preferences: if the target desktop's shortcut is not enabled there,
+    /// we report `.shortcutNotEnabled` instead of sending a dead keystroke.
+    /// If the preferences can't be read, the legacy 1...9 assumption applies.
+    ///
     /// Requirements:
     /// - The user must enable the shortcuts in System Settings →
     ///   Keyboard → Keyboard Shortcuts → Mission Control.
     /// - The app must be granted Accessibility permission to post key events.
+    ///
+    /// Note: only works when the target Space is on the same display as the
+    /// currently active one (Ctrl+N always acts on the current display).
     static func switchToSpace(id spaceID: UInt64) -> SwitchResult {
         guard switchSymbolsAvailable else { return .unavailable }
         guard let uuid = displayUUID(for: spaceID) else { return .notFound }
@@ -128,20 +178,23 @@ enum SkyLight {
         guard let index = spaces.firstIndex(of: spaceID) else { return .notFound }
         let n = index + 1
         guard n <= 9 else { return .indexTooHigh(limit: 9) }
+        let enabled = enabledDesktopShortcuts()
+        // If the preferences are readable, require the exact shortcut.
+        if !enabled.isEmpty, !enabled.contains(n) {
+            return .shortcutNotEnabled(desktop: n)
+        }
         guard AXIsProcessTrusted() else { return .accessibilityDenied }
-        return postControlDigit(n) ? .success : .unavailable
+        return postKey(CGKeyCode(17 + n), flags: .maskControl) ? .success : .unavailable
     }
 
-    /// Posts a Ctrl+<digit> key press/release to the system event tap.
-    /// Keycodes 18...26 are the ANSI "1"..."9" keys.
-    private static func postControlDigit(_ n: Int) -> Bool {
-        let keyCode = CGKeyCode(17 + n)
+    /// Posts a single key press/release to the system event tap.
+    private static func postKey(_ keyCode: CGKeyCode, flags: CGEventFlags) -> Bool {
         guard let source = CGEventSource(stateID: .hidSystemState),
             let down = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: true),
             let up = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: false)
         else { return false }
-        down.flags = .maskControl
-        up.flags = .maskControl
+        down.flags = flags
+        up.flags = flags
         down.post(tap: .cghidEventTap)
         up.post(tap: .cghidEventTap)
         return true

@@ -11,15 +11,29 @@ struct EditorPopover: View {
     @State private var nameBuffer: String = ""
     @State private var bufferedID: UInt64 = 0
     @State private var jumpError: String?
+    @State private var showSettings = false
 
     private let palette = ["#FF6B6B", "#4ECDC4", "#FFE66D", "#95E1D3", "#C7B8EA", "#FFA07A"]
 
     var body: some View {
+        Group {
+            if showSettings {
+                SettingsView(onDone: { showSettings = false })
+            } else {
+                mainContent
+            }
+        }
+        .frame(width: 290)
+        .onAppear { syncBuffer() }
+        .onChange(of: monitor.currentSpaceID) { _ in syncBuffer() }
+    }
+
+    private var mainContent: some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionLabel("Current Space")
+            sectionLabel(L10n.t("section.current"))
             currentCard
 
-            sectionLabel("All Spaces")
+            sectionLabel(L10n.t("section.all"))
             spaceList
 
             if let jumpError {
@@ -33,21 +47,18 @@ struct EditorPopover: View {
             Divider()
 
             HStack {
-                Button("Preferences…") {}
+                Button(L10n.t("button.preferences")) { showSettings = true }
                     .buttonStyle(.plain)
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                 Spacer()
-                Button("Quit") { NSApplication.shared.terminate(nil) }
+                Button(L10n.t("button.quit")) { NSApplication.shared.terminate(nil) }
                     .buttonStyle(.plain)
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
         }
         .padding(13)
-        .frame(width: 290)
-        .onAppear { syncBuffer() }
-        .onChange(of: monitor.currentSpaceID) { _ in syncBuffer() }
     }
 
     private func syncBuffer() {
@@ -64,7 +75,7 @@ struct EditorPopover: View {
 
     private var currentCard: some View {
         VStack(alignment: .leading, spacing: 10) {
-            TextField("Space name", text: $nameBuffer)
+            TextField(L10n.t("field.spaceName"), text: $nameBuffer)
                 .textFieldStyle(.roundedBorder)
                 .font(.system(size: 13))
                 .onChange(of: nameBuffer) { newValue in
@@ -122,7 +133,7 @@ struct EditorPopover: View {
                 .font(.system(size: 13))
             Spacer()
             if isCurrent {
-                Text("current")
+                Text(L10n.t("badge.current"))
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
             }
@@ -137,7 +148,7 @@ struct EditorPopover: View {
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
-            .help(isCurrent ? "Reset current Space label" : "Remove saved Space label")
+            .help(L10n.t(isCurrent ? "help.resetLabel" : "help.removeLabel"))
         }
         .padding(.horizontal, 9)
         .padding(.vertical, 7)
@@ -151,7 +162,7 @@ struct EditorPopover: View {
             guard !isCurrent else { return }
             if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
         }
-        .help(isCurrent ? "Current Space" : "Click to switch to this Space")
+        .help(L10n.t(isCurrent ? "help.currentSpace" : "help.clickToSwitch"))
     }
 
     /// Switches to the Space. On success the host closes the popover; on
@@ -163,13 +174,16 @@ struct EditorPopover: View {
         case .success:
             onJump?()
         case .notFound:
-            jumpError = "这个 Space 不在当前屏幕的桌面序列中，无法跳转"
+            jumpError = L10n.t("error.notFound")
         case .indexTooHigh(let limit):
-            jumpError = "Space 序号超过 \(limit)，系统快捷键不支持跳转"
+            jumpError = L10n.t("error.indexTooHigh", limit)
+        case .shortcutNotEnabled(let desktop):
+            jumpError = L10n.t("error.shortcutNotEnabled", desktop)
         case .accessibilityDenied:
-            jumpError = "需要辅助功能权限：设置 → 隐私与安全 → 辅助功能 → 打开 Space Labeler"
+            SkyLight.promptForAccessibility()
+            jumpError = L10n.t("error.accessibility")
         case .unavailable:
-            jumpError = "跳转不可用：私有 API 解析失败，或系统「切换到桌面 N」快捷键未开启"
+            jumpError = L10n.t("error.unavailable")
         }
     }
 }

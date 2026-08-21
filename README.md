@@ -54,6 +54,14 @@ Click any Space in the "All Spaces" list to jump straight to it. Jumping synthes
 
 The list shows the desktop's order (1, 2, 3…) as Mission Control sees it, so the mapping is automatic. Spaces beyond the 9th desktop can't be jumped to directly — use `Ctrl+←` / `Ctrl+→` for those. If a required permission or shortcut is missing, the popover shows the same path inline (设置 → 隐私与安全 → 辅助功能 → 打开 Space Labeler) instead of failing silently.
 
+### Direct jumps (Ctrl+N)
+
+Jumping posts a single "Switch to Desktop N" shortcut (`Ctrl+N`). SpaceLabeler automatically reads which desktop shortcuts are actually enabled on this machine: if the target desktop's shortcut isn't checked, you get a precise message ("Desktop N's shortcut is not enabled — check it in Mission Control") instead of a dead keystroke.
+
+Open **Preferences…** — a **STATUS** self-check shows the live Accessibility grant state, the system's enabled Ctrl+N shortcuts (e.g. `1, 2, 3, 4`), and a "Request permission…" button that pops the system authorization dialog.
+
+Preferences also includes a **Language** picker (中文 by default, English available) — the UI switches immediately and persists.
+
 Labels and colors persist across reboots in `UserDefaults` under the key `SpaceLabels.v1`.
 
 ## Development

@@ -1,0 +1,117 @@
+import Foundation
+
+/// User-facing language for the app UI. Independent of the system locale;
+/// defaults to English.
+enum AppLanguage: String, CaseIterable, Identifiable {
+    case en
+    case zh
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .en: return "English"
+        case .zh: return "中文"
+        }
+    }
+}
+
+/// Tiny string-table-based localization. Keys are stable identifiers, values
+/// come from a zh/en table in code (no .lproj resources needed for a menu bar
+/// app). `t()` falls back to the key itself so a missing entry never crashes.
+enum L10n {
+    static let languageDefaultsKey = "appLanguage"
+
+    /// Read from UserDefaults; defaults to Chinese.
+    static func currentLanguage() -> AppLanguage {
+        AppLanguage(
+            rawValue: UserDefaults.standard.string(forKey: languageDefaultsKey) ?? ""
+        ) ?? .zh
+    }
+
+    static func t(_ key: String) -> String {
+        let table = currentLanguage() == .zh ? zhTable : enTable
+        return table[key] ?? key
+    }
+
+    /// Localized string with printf-style formatting (`%@`, `%d`, …).
+    static func t(_ key: String, _ args: CVarArg...) -> String {
+        String(format: t(key), arguments: args)
+    }
+
+    private static let enTable: [String: String] = [
+        // EditorPopover
+        "section.current": "Current Space",
+        "section.all": "All Spaces",
+        "badge.current": "current",
+        "button.preferences": "Preferences…",
+        "button.quit": "Quit",
+        "field.spaceName": "Space name",
+        "help.resetLabel": "Reset current Space label",
+        "help.removeLabel": "Remove saved Space label",
+        "help.currentSpace": "Current Space",
+        "help.clickToSwitch": "Click to switch to this Space",
+        "error.notFound": "This Space is not on the current display's desktop sequence and can't be jumped to",
+        "error.indexTooHigh": "Space number exceeds %d — not supported by system shortcuts",
+        "error.accessibility": "Accessibility permission required: System Settings → Privacy & Security → Accessibility → enable Space Labeler (restart the app if you just enabled it)",
+        "error.shortcutNotEnabled": "Desktop %d's shortcut is not enabled — check “Switch to Desktop %d” in System Settings → Keyboard → Keyboard Shortcuts → Mission Control",
+        "error.unavailable": "Jump unavailable: private API resolution failed, or the system “Switch to Desktop N” shortcuts are not enabled",
+
+        // Environment self-check (SettingsView)
+        "settings.status": "STATUS",
+        "settings.accessibility": "Accessibility permission",
+        "settings.granted": "Granted",
+        "settings.notGranted": "Not granted — enable it in Privacy & Security → Accessibility. If you just did, quit and relaunch the app.",
+        "settings.shortcutTitle": "Desktop switch shortcuts",
+        "settings.shortcutHint": "Enable the “Switch to Desktop 1…9” shortcuts you need in System Settings → Keyboard → Keyboard Shortcuts → Mission Control.",
+        "settings.refresh": "Refresh",
+        "settings.requestPermission": "Request permission…",
+        "settings.requestPermissionHint": "Triggers the system authorization dialog (only shown when the permission is not granted).",
+        "settings.digitsLabel": "Ctrl+N desktop shortcuts",
+        "settings.digitsValueNone": "None enabled — enable “Switch to Desktop 1…9”",
+        "settings.selfCheckHint": "Jumping posts Ctrl+N — the Accessibility permission and the target desktop's “Switch to Desktop N” shortcut must both be enabled, and the target Space must be on the current display.",
+
+        // SettingsView
+        "settings.back": "Back",
+        "settings.title": "SETTINGS",
+        "settings.language": "Language",
+    ]
+
+    private static let zhTable: [String: String] = [
+        // EditorPopover
+        "section.current": "当前 Space",
+        "section.all": "所有 Space",
+        "badge.current": "当前",
+        "button.preferences": "偏好设置…",
+        "button.quit": "退出",
+        "field.spaceName": "Space 名称",
+        "help.resetLabel": "重置当前 Space 标签",
+        "help.removeLabel": "移除已保存的 Space 标签",
+        "help.currentSpace": "当前 Space",
+        "help.clickToSwitch": "点击切换到该 Space",
+        "error.notFound": "这个 Space 不在当前屏幕的桌面序列中，无法跳转",
+        "error.indexTooHigh": "Space 序号超过 %d，系统快捷键不支持跳转",
+        "error.accessibility": "需要辅助功能权限：设置 → 隐私与安全性 → 辅助功能 → 打开 Space Labeler（若刚开启请退出并重新启动应用）",
+        "error.shortcutNotEnabled": "桌面 %d 的快捷键未启用——请在系统设置 → 键盘 → 键盘快捷键 → 调度中心勾选「切换到桌面 %d」",
+        "error.unavailable": "跳转不可用：私有 API 解析失败，或系统「切换到桌面 N」快捷键未开启",
+
+        // Environment self-check (SettingsView)
+        "settings.status": "环境自检",
+        "settings.accessibility": "辅助功能权限",
+        "settings.granted": "已授权",
+        "settings.notGranted": "未授权 — 请在「隐私与安全性 → 辅助功能」中打开。若刚开启，请退出并重新启动应用。",
+        "settings.shortcutTitle": "桌面切换快捷键",
+        "settings.shortcutHint": "请在「系统设置 → 键盘 → 键盘快捷键 → 调度中心」勾选需要的「切换到桌面 1…9」。",
+        "settings.refresh": "刷新",
+        "settings.requestPermission": "请求权限…",
+        "settings.requestPermissionHint": "触发系统授权弹窗（仅在权限未授权时显示）。",
+        "settings.digitsLabel": "数字桌面快捷键",
+        "settings.digitsValueNone": "未启用任何数字快捷键——请勾选「切换到桌面 1…9」",
+        "settings.selfCheckHint": "跳转通过发送 Ctrl+N 实现：需要辅助功能权限已授权、目标桌面的「切换到桌面 N」快捷键已勾选、目标 Space 在当前屏幕。",
+
+        // SettingsView
+        "settings.back": "返回",
+        "settings.title": "设置",
+        "settings.language": "语言",
+    ]
+}

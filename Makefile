@@ -29,9 +29,15 @@ install: build
 	-pkill -x SpaceLabeler 2>/dev/null
 	rm -rf $(HOME)/Applications/$(APP_NAME)
 	cp -R $(BUILD_DIR)/Build/Products/Release/$(APP_NAME) $(HOME)/Applications/
+	# Reset stale Accessibility TCC records: ad-hoc resigning changes the code
+	# fingerprint on every build, so macOS accumulates dead entries under the
+	# same bundle id that can shadow the fresh grant. May prompt for sudo.
 	@echo ""
-	@echo "NOTE: if jumping fails or the STATUS check shows Accessibility not granted,"
-	@echo "re-grant it once (ad-hoc signing changes the code fingerprint every build):"
+	@echo "Clearing stale Accessibility records for $(LABEL)…"
+	@sudo tccutil reset Accessibility $(LABEL) || echo "  skipped — if jumping fails, run manually: sudo tccutil reset Accessibility $(LABEL)"
+	@echo ""
+	@echo "NOTE: re-grant Accessibility once for this build if the STATUS check shows"
+	@echo "not granted (or jumping fails):"
 	@echo "  System Settings -> Privacy & Security -> Accessibility"
 	@echo "  -> toggle Space Labeler OFF then ON (or delete + re-add the entry)"
 	@if [ -f "$(HOME)/Library/LaunchAgents/$(LABEL).plist" ]; then \

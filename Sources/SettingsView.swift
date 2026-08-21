@@ -151,15 +151,21 @@ struct SettingsView: View {
                     .foregroundStyle(digits.isEmpty ? .red : .green)
             }
 
-            Text(L10n.t("settings.shortcutHint"))
-                .font(.system(size: 10))
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            // Troubleshooting tips only appear while there is a problem to
+            // fix; a fully working setup keeps this card compact.
+            if !axTrusted {
+                Text(L10n.t("settings.selfCheckHint"))
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
-            Text(L10n.t("settings.selfCheckHint"))
-                .font(.system(size: 10))
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            if digits.isEmpty {
+                Text(L10n.t("settings.shortcutHint"))
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .padding(11)
         .background(

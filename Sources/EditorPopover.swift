@@ -12,8 +12,16 @@ struct EditorPopover: View {
     @State private var bufferedID: UInt64 = 0
     @State private var jumpError: String?
     @State private var showSettings = false
+    /// Space currently selected via the ↑/↓ keys.
+    @State private var selectedID: UInt64?
+    @State private var keyMonitor: Any?
+    /// Whether the name field is focused (⌘R toggles it on).
+    @FocusState private var nameFocused: Bool
+    @State private var keyObserver: NSObjectProtocol?
 
     private let palette = ["#FF6B6B", "#4ECDC4", "#FFE66D", "#95E1D3", "#C7B8EA", "#FFA07A"]
+
+    private var sortedIDs: [UInt64] { store.labels.keys.sorted() }
 
     var body: some View {
         Group {
@@ -24,7 +32,17 @@ struct EditorPopover: View {
             }
         }
         .frame(width: 290)
-        .onAppear { syncBuffer() }
+        .onAppear {
+            syncBuffer()
+            selectedID = monitor.currentSpaceID
+            installKeyMonitor()
+            installKeyObserver()
+            focusOnList()
+        }
+        .onDisappear {
+            removeKeyMonitor()
+            removeKeyObserver()
+        }
         .onChange(of: monitor.currentSpaceID) { _ in syncBuffer() }
     }
 
@@ -78,6 +96,7 @@ struct EditorPopover: View {
             TextField(L10n.t("field.spaceName"), text: $nameBuffer)
                 .textFieldStyle(.roundedBorder)
                 .font(.system(size: 13))
+                .focused($nameFocused)
                 .onChange(of: nameBuffer) { newValue in
                     var l = store.label(for: bufferedID)
                     l.name = newValue
@@ -115,9 +134,20 @@ struct EditorPopover: View {
     }
 
     private var spaceList: some View {
-        VStack(spacing: 1) {
-            ForEach(store.labels.keys.sorted(), id: \.self) { id in
-                spaceRow(id: id)
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(spacing: 1) {
+                    ForEach(sortedIDs, id: \.self) { id in
+                        spaceRow(id: id)
+                            .id(id)
+                    }
+                }
+            }
+            .onChange(of: selectedID) { newID in
+                guard let newID else { return }
+                withAnimation(.easeOut(duration: 0.15)) {
+                    proxy.scrollTo(newID, anchor: .center)
+                }
             }
         }
     }
@@ -125,6 +155,7 @@ struct EditorPopover: View {
     private func spaceRow(id: UInt64) -> some View {
         let label = store.labels[id] ?? SpaceLabel(name: "?", colorHex: "#888888")
         let isCurrent = id == monitor.currentSpaceID
+        let isSelected = id == selectedID
         return HStack(spacing: 9) {
             Circle()
                 .fill(Color(hex: label.colorHex) ?? .gray)
@@ -142,6 +173,9 @@ struct EditorPopover: View {
                 if isCurrent {
                     syncBuffer()
                 }
+                if id == selectedID {
+                    selectedID = monitor.currentSpaceID
+                }
             } label: {
                 Image(systemName: "trash")
                     .font(.system(size: 11))
@@ -154,8 +188,13 @@ struct EditorPopover: View {
         .padding(.vertical, 7)
         .background(
             RoundedRectangle(cornerRadius: 6)
-                .fill(isCurrent ? Color.accentColor.opacity(0.16) : Color.clear)
+                .fill(rowBackground(isCurrent: isCurrent, isSelected: isSelected))
         )
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(isSelected ? Color.accentColor.opacity(0.7) : Color.clear, lineWidth: 1.2)
+        )
+        .animation(.easeOut(duration: 0.12), value: selectedID)
         .contentShape(Rectangle())
         .onTapGesture { jump(to: id) }
         .onHover { hovering in
@@ -163,6 +202,113 @@ struct EditorPopover: View {
             if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
         }
         .help(L10n.t(isCurrent ? "help.currentSpace" : "help.clickToSwitch"))
+    }
+
+    private func rowBackground(isCurrent: Bool, isSelected: Bool) -> Color {
+        if isCurrent { return Color.accentColor.opacity(0.16) }
+        if isSelected { return Color.accentColor.opacity(0.08) }
+        return Color.clear
+    }
+
+    /// ↑/↓ moves the selection through the Space list; ⏎ jumps to the
+    /// selected Space. Key events are left alone while the name field is
+    /// being edited, and any ⌃ combination is passed through (the ^⇧↑
+    /// toggle hotkey must reach the app-level monitor).
+    private func installKeyMonitor() {
+        guard keyMonitor == nil else { return }
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [self] event in
+            // Let the name TextField handle keys while it owns first responder.
+            if let firstResponder = NSApp.keyWindow?.firstResponder, firstResponder is NSTextView {
+                return event
+            }
+            switch event.keyCode {
+            case 126:  // ↑
+                if event.modifierFlags.contains(.control) { return event }
+                self.moveSelection(-1)
+                return nil
+            case 125:  // ↓
+                self.moveSelection(1)
+                return nil
+            case 36, 76:  // ⏎ / numpad ⏎
+                self.jumpToSelected()
+                return nil
+            case 15:  // R
+                if !event.modifierFlags.contains(.command) { return event }
+                self.startRenaming()
+                return nil
+            default:
+                return event
+            }
+        }
+    }
+
+    private func removeKeyMonitor() {
+        if let keyMonitor {
+            NSEvent.removeMonitor(keyMonitor)
+            self.keyMonitor = nil
+        }
+    }
+
+    /// AppKit auto-focuses the name TextField whenever the popover window
+/// becomes key (initial first responder). @FocusState can't override that
+/// once it has happened, so listen for the window becoming key and grab
+/// the focus back — the Space list owns it by default, and ↑/↓ + ⏎ work
+/// immediately. The user can still focus the field (click or ⌘R).
+    private func installKeyObserver() {
+        guard keyObserver == nil else { return }
+        keyObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didBecomeKeyNotification,
+            object: nil,
+            queue: .main
+        ) { [self] _ in
+            stealFocusFromNameField()
+        }
+    }
+
+    private func removeKeyObserver() {
+        if let keyObserver {
+            NotificationCenter.default.removeObserver(keyObserver)
+            self.keyObserver = nil
+        }
+    }
+
+    private func stealFocusFromNameField() {
+        // One runloop hop: the initial-first-responder assignment happens
+        // right after the notification, so wait for it before stealing back.
+        DispatchQueue.main.async {
+            guard let window = NSApp.keyWindow,
+                window.firstResponder is NSTextView
+            else { return }
+            window.makeFirstResponder(nil)
+        }
+    }
+
+    private func focusOnList() {
+        nameFocused = false
+    }
+
+    private func moveSelection(_ delta: Int) {
+        guard !sortedIDs.isEmpty else { return }
+        guard let current = selectedID, let index = sortedIDs.firstIndex(of: current) else {
+            selectedID = monitor.currentSpaceID
+            return
+        }
+        let newIndex = min(max(index + delta, 0), sortedIDs.count - 1)
+        selectedID = sortedIDs[newIndex]
+    }
+
+    private func jumpToSelected() {
+        guard let id = selectedID else { return }
+        jump(to: id)
+    }
+
+    /// ⌘R: focus the name field (renaming the current Space) and select its
+    /// current contents so typing replaces them right away.
+    private func startRenaming() {
+        nameFocused = true
+        DispatchQueue.main.async {
+            (NSApp.keyWindow?.firstResponder as? NSTextView)?.selectAll(nil)
+        }
     }
 
     /// Switches to the Space. On success the host closes the popover; on

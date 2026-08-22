@@ -10,6 +10,10 @@ struct SpaceLabel: Codable, Equatable {
 /// New Spaces auto-assign a default name ("Space N") and a color from a rotating palette.
 final class SpaceStore: ObservableObject {
     @Published var labels: [UInt64: SpaceLabel] = [:]
+    /// True while a name is being edited in the popover. The menu bar label
+    /// stays frozen (no width jitter from the partially-typed name) until
+    /// the edit session ends (⏎/Esc/click-away).
+    @Published var isRenaming = false
 
     private let labelsKey = "SpaceLabels.v1"
     private let palette = ["#FF6B6B", "#4ECDC4", "#FFE66D", "#95E1D3", "#C7B8EA", "#FFA07A"]

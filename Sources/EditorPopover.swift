@@ -15,8 +15,14 @@ struct EditorPopover: View {
     /// Space currently selected via the ↑/↓ keys.
     @State private var selectedID: UInt64?
     @State private var keyMonitor: Any?
-    /// Whether the name field is focused (⌘R toggles it on).
-    @FocusState private var nameFocused: Bool
+    /// Monotonic token bumped on ⌘R; the name field reacts by grabbing
+    /// focus and selecting its contents.
+    @State private var renameRequestToken = 0
+    /// Row the pointer is currently hovering (the Delete-key target).
+    @State private var hoveredID: UInt64?
+    /// Row armed for deletion: the first Delete press sets it (red trash
+    /// icon hint), a second Delete press actually removes it.
+    @State private var pendingDeleteID: UInt64?
     @State private var keyObserver: NSObjectProtocol?
 
     private let palette = ["#FF6B6B", "#4ECDC4", "#FFE66D", "#95E1D3", "#C7B8EA", "#FFA07A"]
@@ -35,9 +41,10 @@ struct EditorPopover: View {
         .onAppear {
             syncBuffer()
             selectedID = monitor.currentSpaceID
+            hoveredID = nil
+            pendingDeleteID = nil
             installKeyMonitor()
             installKeyObserver()
-            focusOnList()
         }
         .onDisappear {
             removeKeyMonitor()
@@ -93,15 +100,29 @@ struct EditorPopover: View {
 
     private var currentCard: some View {
         VStack(alignment: .leading, spacing: 10) {
-            TextField(L10n.t("field.spaceName"), text: $nameBuffer)
-                .textFieldStyle(.roundedBorder)
-                .font(.system(size: 13))
-                .focused($nameFocused)
+            HStack(spacing: 6) {
+                RenameTextField(
+                    text: $nameBuffer,
+                    placeholder: L10n.t("field.spaceName"),
+                    focusRequestToken: renameRequestToken,
+                    onEditingChanged: { editing in
+                        // While editing, the menu bar label stays frozen; it
+                        // refreshes when the edit session ends (⏎/Esc/click-away).
+                        store.isRenaming = editing
+                    }
+                )
                 .onChange(of: nameBuffer) { newValue in
                     var l = store.label(for: bufferedID)
                     l.name = newValue
                     store.update(bufferedID, l)
                 }
+
+                // ⏎ hint: the edit commits and focus returns to the list.
+                Image(systemName: "return")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(store.isRenaming ? Color.accentColor : Color.secondary)
+                    .help(L10n.t("hint.enterToSubmit"))
+            }
 
             HStack(spacing: 7) {
                 ForEach(palette, id: \.self) { hex in
@@ -156,6 +177,7 @@ struct EditorPopover: View {
         let label = store.labels[id] ?? SpaceLabel(name: "?", colorHex: "#888888")
         let isCurrent = id == monitor.currentSpaceID
         let isSelected = id == selectedID
+        let isPendingDelete = id == pendingDeleteID
         return HStack(spacing: 9) {
             Circle()
                 .fill(Color(hex: label.colorHex) ?? .gray)
@@ -169,44 +191,53 @@ struct EditorPopover: View {
                     .foregroundStyle(.secondary)
             }
             Button {
-                store.remove(id)
-                if isCurrent {
-                    syncBuffer()
-                }
-                if id == selectedID {
-                    selectedID = monitor.currentSpaceID
-                }
+                deleteLabel(id)
             } label: {
-                Image(systemName: "trash")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
+                Image(systemName: isPendingDelete ? "trash.fill" : "trash")
+                    .font(.system(size: isPendingDelete ? 12 : 11))
+                    .foregroundStyle(isPendingDelete ? Color.red : Color.secondary)
+                    .scaleEffect(isPendingDelete ? 1.2 : 1)
+                    .animation(.easeOut(duration: 0.12), value: isPendingDelete)
             }
             .buttonStyle(.plain)
-            .help(L10n.t(isCurrent ? "help.resetLabel" : "help.removeLabel"))
+            .help(L10n.t(isPendingDelete ? "hint.deletePending" : (isCurrent ? "help.resetLabel" : "help.removeLabel")))
         }
         .padding(.horizontal, 9)
         .padding(.vertical, 7)
         .background(
             RoundedRectangle(cornerRadius: 6)
-                .fill(rowBackground(isCurrent: isCurrent, isSelected: isSelected))
+                .fill(rowBackground(isCurrent: isCurrent, isSelected: isSelected, isHovered: hoveredID == id, isPendingDelete: isPendingDelete))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 6)
-                .stroke(isSelected ? Color.accentColor.opacity(0.7) : Color.clear, lineWidth: 1.2)
+                .stroke(
+                    isPendingDelete ? Color.red.opacity(0.7)
+                        : (isSelected ? Color.accentColor.opacity(0.7) : Color.clear),
+                    lineWidth: 1.2
+                )
         )
         .animation(.easeOut(duration: 0.12), value: selectedID)
+        .animation(.easeOut(duration: 0.12), value: pendingDeleteID)
         .contentShape(Rectangle())
         .onTapGesture { jump(to: id) }
         .onHover { hovering in
-            guard !isCurrent else { return }
-            if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+            if hovering {
+                hoveredID = id
+                guard !isCurrent else { return }
+                NSCursor.pointingHand.push()
+            } else {
+                if hoveredID == id { hoveredID = nil }
+                NSCursor.pop()
+            }
         }
         .help(L10n.t(isCurrent ? "help.currentSpace" : "help.clickToSwitch"))
     }
 
-    private func rowBackground(isCurrent: Bool, isSelected: Bool) -> Color {
+    private func rowBackground(isCurrent: Bool, isSelected: Bool, isHovered: Bool, isPendingDelete: Bool) -> Color {
+        if isPendingDelete { return Color.red.opacity(0.1) }
         if isCurrent { return Color.accentColor.opacity(0.16) }
         if isSelected { return Color.accentColor.opacity(0.08) }
+        if isHovered { return Color.white.opacity(0.05) }
         return Color.clear
     }
 
@@ -219,6 +250,12 @@ struct EditorPopover: View {
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [self] event in
             // Let the name TextField handle keys while it owns first responder.
             if let firstResponder = NSApp.keyWindow?.firstResponder, firstResponder is NSTextView {
+                // Except Esc, which ends the rename session and returns
+                // ↑/↓/⏎ to the list.
+                if event.keyCode == 53 {
+                    self.endRenaming()
+                    return nil
+                }
                 return event
             }
             switch event.keyCode {
@@ -231,6 +268,9 @@ struct EditorPopover: View {
                 return nil
             case 36, 76:  // ⏎ / numpad ⏎
                 self.jumpToSelected()
+                return nil
+            case 51, 117:  // ⌫ / ⌦ — arms the hovered row, then deletes it
+                self.handleDelete()
                 return nil
             case 15:  // R
                 if !event.modifierFlags.contains(.command) { return event }
@@ -283,8 +323,33 @@ struct EditorPopover: View {
         }
     }
 
-    private func focusOnList() {
-        nameFocused = false
+    /// Delete key: targets the hovered row, falling back to the ↑/↓-selected
+    /// row (hover tracking inside the popover's ScrollView is not always
+    /// reliable). The first press arms the row — red trash hint, and the
+    /// selection follows so the feedback is unmistakable — and the second
+    /// press deletes it; the pointer may leave the row in between.
+    private func handleDelete() {
+        let target = hoveredID ?? selectedID
+        if let id = target, pendingDeleteID != id {
+            pendingDeleteID = id
+            selectedID = id
+            return
+        }
+        guard let id = pendingDeleteID else { return }
+        deleteLabel(id)
+    }
+
+    /// Removes a saved label (or resets the current Space's label to a
+    /// fresh default name + color) and clears the pending-delete state.
+    private func deleteLabel(_ id: UInt64) {
+        store.remove(id)
+        if id == monitor.currentSpaceID {
+            syncBuffer()
+        }
+        if id == selectedID {
+            selectedID = monitor.currentSpaceID
+        }
+        pendingDeleteID = nil
     }
 
     private func moveSelection(_ delta: Int) {
@@ -302,13 +367,15 @@ struct EditorPopover: View {
         jump(to: id)
     }
 
-    /// ⌘R: focus the name field (renaming the current Space) and select its
-    /// current contents so typing replaces them right away.
+    /// ⌘R: bump the request token; the name field responds by grabbing focus
+    /// and selecting its current contents so typing replaces them right away.
     private func startRenaming() {
-        nameFocused = true
-        DispatchQueue.main.async {
-            (NSApp.keyWindow?.firstResponder as? NSTextView)?.selectAll(nil)
-        }
+        renameRequestToken += 1
+    }
+
+    /// Esc while renaming: give keyboard control (↑/↓/⏎) back to the list.
+    private func endRenaming() {
+        NSApp.keyWindow?.makeFirstResponder(nil)
     }
 
     /// Switches to the Space. On success the host closes the popover; on
@@ -330,6 +397,83 @@ struct EditorPopover: View {
             jumpError = L10n.t("error.accessibility")
         case .unavailable:
             jumpError = L10n.t("error.unavailable")
+        }
+    }
+}
+
+/// NSTextField wrapper. Unlike SwiftUI's TextField — whose text binding does
+/// not update while an input method is composing (marked text, e.g. pinyin) —
+/// the delegate hears about every editing change, so renaming updates the
+/// store live instead of only after ⏎ confirms the composition.
+private struct RenameTextField: NSViewRepresentable {
+    @Binding var text: String
+    var placeholder: String
+    /// Increment to request focus + select-all (⌘R).
+    var focusRequestToken: Int
+    /// Fired when the editing session starts / ends (⏎, Esc, click-away).
+    var onEditingChanged: (Bool) -> Void = { _ in }
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    func makeNSView(context: Context) -> NSTextField {
+        let field = NSTextField(string: text)
+        field.placeholderString = placeholder
+        field.bezelStyle = .roundedBezel
+        field.font = .systemFont(ofSize: 13)
+        field.focusRingType = .default
+        field.delegate = context.coordinator
+        field.target = context.coordinator
+        field.action = #selector(Coordinator.commit(_:))
+        return field
+    }
+
+    func updateNSView(_ field: NSTextField, context: Context) {
+        // Compare against the live field-editor string, which includes any
+        // uncommitted IME text; never overwrite mid-composition — that would
+        // interrupt the input method.
+        let current = field.currentEditor()?.string ?? field.stringValue
+        if current != text {
+            field.stringValue = text
+        }
+        let coordinator = context.coordinator
+        if coordinator.focusToken != focusRequestToken {
+            coordinator.focusToken = focusRequestToken
+            DispatchQueue.main.async {
+                field.selectText(nil)
+            }
+        }
+    }
+
+    final class Coordinator: NSObject, NSTextFieldDelegate {
+        var parent: RenameTextField
+        var focusToken = 0
+
+        init(_ parent: RenameTextField) {
+            self.parent = parent
+        }
+
+        /// Fires on every keystroke — including IME composition updates —
+        /// so the label persists live (pinyin included) rather than only on ⏎.
+        func controlTextDidChange(_ obj: Notification) {
+            guard let field = obj.object as? NSTextField else { return }
+            let editorText = field.currentEditor()?.string ?? field.stringValue
+            parent.text = editorText
+        }
+
+        func controlTextDidBeginEditing(_ obj: Notification) {
+            parent.onEditingChanged(true)
+        }
+
+        func controlTextDidEndEditing(_ obj: Notification) {
+            parent.onEditingChanged(false)
+        }
+
+        /// ⏎: commit the final text, then drop focus back to the Space list
+        /// so ↑/↓ and ⏎ keep working for navigation.
+        @objc func commit(_ sender: Any?) {
+            guard let field = sender as? NSTextField else { return }
+            parent.text = field.stringValue
+            field.window?.makeFirstResponder(nil)
         }
     }
 }

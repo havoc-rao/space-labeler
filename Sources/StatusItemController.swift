@@ -64,11 +64,15 @@ final class StatusItemController {
             }
             .store(in: &cancellables)
 
-        // React to label edits (rename / recolor).
+        // React to label edits (rename / recolor). While a name is being
+        // edited the menu bar label is frozen: re-rendering on every
+        // keystroke makes the status item's width change and jitters the
+        // whole menu bar. It refreshes once the edit session ends.
         store.$labels
+            .combineLatest(store.$isRenaming)
             .receive(on: RunLoop.main)
-            .sink { [weak self] _ in
-                guard let self else { return }
+            .sink { [weak self] _, isRenaming in
+                guard let self, !isRenaming else { return }
                 self.render(id: self.monitor.currentSpaceID)
             }
             .store(in: &cancellables)

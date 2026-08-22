@@ -8,6 +8,8 @@
 	<string>Space Labeler</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.jeremywatt.SpaceLabeler</string>
 	<key>CFBundleInfoDictionaryVersion</key>

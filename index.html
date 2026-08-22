@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SpaceLabeler</title>
+  <link rel="icon" type="image/png" sizes="256x256" href="assets/derived/logo-256.png">
+  <link rel="apple-touch-icon" href="assets/derived/logo-256.png">
   <style>
     :root {
       color-scheme: dark;
@@ -56,6 +58,15 @@
       color: var(--muted);
       font-size: clamp(18px, 2vw, 22px);
       line-height: 1.5;
+    }
+
+    .brandmark {
+      display: block;
+      width: 96px;
+      height: 96px;
+      margin-bottom: 28px;
+      border-radius: 22px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
     }
 
     .menu-demo {
@@ -157,6 +168,7 @@
 <body>
   <main>
     <section class="copy">
+      <img class="brandmark" src="assets/derived/logo-128.png" alt="SpaceLabeler icon" width="96" height="96">
       <h1>Name your macOS Spaces.</h1>
       <p>SpaceLabeler puts the current desktop name and color in the menu bar so "Space 3" can become "Writing", "Builds", or "Browser QA".</p>
     </section>

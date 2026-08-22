@@ -2,6 +2,10 @@
 
 [![Discord](https://img.shields.io/badge/Discord-Join%20Server-7289da?style=flat&logo=discord&logoColor=white)](https://discord.gg/7xsxU4ZG6A)
 
+<p align="center">
+  <img src="assets/derived/logo-256.png" width="128" height="128" alt="SpaceLabeler icon">
+</p>
+
 一个极简的 macOS 菜单栏应用，用于给你的虚拟桌面（Spaces）命名和配色。
 
 macOS 本身不支持为 Spaces 命名——而 `TotalSpaces2` 又因 Apple 的 SIP 加固而消亡——SpaceLabeler 正好填补了这个让人恼火的小空缺。它会在菜单栏显示一个彩色圆点和当前 Space 的名称，切换 Space 时自动更新，并支持在弹出面板中为每个 Space 重命名、换色。

@@ -35,6 +35,7 @@ targets:
         CFBundleVersion: "1"
         LSMinimumSystemVersion: "13.0"
         NSHumanReadableCopyright: "Copyright © 2026 Jeremy Watt"
+        CFBundleIconFile: AppIcon
 
   SpaceLabelerTests:
     type: bundle.unit-test

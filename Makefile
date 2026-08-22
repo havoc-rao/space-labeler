@@ -8,19 +8,30 @@ LABEL := com.jeremywatt.SpaceLabeler
 APP_NAME := SpaceLabeler.app
 BUILD_DIR := build
 
+# Versioning: the VERSION file is the single source of truth for the
+# marketing version; the build number is the git commit count, so every
+# commit produces a distinguishable build. Both are injected as xcodebuild
+# overrides (Info.plist resolves them via $(MARKETING_VERSION) /
+# $(CURRENT_PROJECT_VERSION)).
+MARKETING_VERSION := $(shell cat VERSION 2>/dev/null || echo 0.0.0)
+CURRENT_PROJECT_VERSION := $(shell git rev-list --count HEAD 2>/dev/null || echo 0)
+VERSION_SETTINGS := MARKETING_VERSION=$(MARKETING_VERSION) CURRENT_PROJECT_VERSION=$(CURRENT_PROJECT_VERSION)
+
 build:
 	xcodegen generate
 	xcodebuild build \
 	  -project $(PROJECT) -scheme $(SCHEME) \
 	  -configuration Release -destination 'platform=macOS' \
-	  -derivedDataPath $(BUILD_DIR)
+	  -derivedDataPath $(BUILD_DIR) \
+	  $(VERSION_SETTINGS)
 
 test:
 	xcodegen generate
 	xcodebuild test \
 	  -project $(PROJECT) -scheme $(SCHEME) \
 	  -destination 'platform=macOS' \
-	  -derivedDataPath $(BUILD_DIR)
+	  -derivedDataPath $(BUILD_DIR) \
+	  $(VERSION_SETTINGS)
 
 install: build
 	mkdir -p $(HOME)/Applications

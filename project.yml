@@ -9,6 +9,9 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.9"
+    # Defaults for building straight from Xcode. `make build` overrides
+    # these from the VERSION file + git commit count — the VERSION file is
+    # the single source of truth for releases.
     MARKETING_VERSION: "0.1.0"
     CURRENT_PROJECT_VERSION: "1"
     DEVELOPMENT_TEAM: ""
@@ -31,8 +34,8 @@ targets:
         CFBundleName: SpaceLabeler
         CFBundleDisplayName: Space Labeler
         CFBundleIdentifier: com.jeremywatt.SpaceLabeler
-        CFBundleShortVersionString: "0.1.0"
-        CFBundleVersion: "1"
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         LSMinimumSystemVersion: "13.0"
         NSHumanReadableCopyright: "Copyright © 2026 Jeremy Watt"
         CFBundleIconFile: AppIcon

@@ -77,6 +77,10 @@ struct EditorPopover: View {
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                 Spacer()
+                Text(appVersion)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+                Spacer()
                 Button(L10n.t("button.quit")) { NSApplication.shared.terminate(nil) }
                     .buttonStyle(.plain)
                     .font(.system(size: 11))
@@ -89,6 +93,13 @@ struct EditorPopover: View {
     private func syncBuffer() {
         bufferedID = monitor.currentSpaceID
         nameBuffer = store.label(for: monitor.currentSpaceID).name
+    }
+
+    /// "v0.1.0 (1)" — marketing version and build number from the bundle.
+    private var appVersion: String {
+        let short = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0"
+        return "v\(short) (\(build))"
     }
 
     private func sectionLabel(_ text: String) -> some View {

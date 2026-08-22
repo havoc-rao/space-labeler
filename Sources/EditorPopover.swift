@@ -23,9 +23,9 @@ struct EditorPopover: View {
     /// Row armed for deletion: the first Delete press sets it (red trash
     /// icon hint), a second Delete press actually removes it.
     @State private var pendingDeleteID: UInt64?
+    /// Whether the full 12-color palette is expanded (default: one row).
+    @State private var showAllColors = false
     @State private var keyObserver: NSObjectProtocol?
-
-    private let palette = ["#FF6B6B", "#4ECDC4", "#FFE66D", "#95E1D3", "#C7B8EA", "#FFA07A"]
 
     private var sortedIDs: [UInt64] { store.labels.keys.sorted() }
 
@@ -124,17 +124,82 @@ struct EditorPopover: View {
                     .help(L10n.t("hint.enterToSubmit"))
             }
 
-            HStack(spacing: 7) {
-                ForEach(palette, id: \.self) { hex in
-                    swatch(hex: hex)
-                }
-            }
+            colorPicker
         }
         .padding(11)
         .background(
             RoundedRectangle(cornerRadius: 8)
                 .fill(Color.white.opacity(0.055))
         )
+    }
+
+    /// Color picker: in both states the swatches keep their natural 28×24
+        /// footprint; expanding only adds height (a second row), and the
+        /// chevron always sits in the 7th cell of the first row, so the
+        /// two states never re-flow horizontally.
+        private var colorPicker: some View {
+            let collapsed = collapsedPaletteColors()
+            return Grid(horizontalSpacing: 6, verticalSpacing: 6) {
+                GridRow {
+                    ForEach(collapsed, id: \.self) { hex in
+                        swatchCell(hex)
+                    }
+                    // The chevron is the 7th cell right after the
+                    // swatches — no padding cell needed.
+                    colorExpandButton
+                }
+                if showAllColors {
+                    GridRow {
+                        ForEach(SpacePalette.darkColors, id: \.self) { hex in
+                            swatchCell(hex)
+                        }
+                    }
+                }
+            }
+        }
+
+        /// Uniform grid cell footprint (28 wide × 24 tall) so the light row,
+        /// the dark row and the chevron all line up on the same 8 columns.
+        private func swatchCell(_ hex: String) -> some View {
+            swatch(hex: hex).frame(width: 28, height: 24)
+        }
+
+        private var emptyCell: some View {
+            Color.clear.frame(width: 28, height: 24)
+        }
+
+    private var colorExpandButton: some View {
+        Button {
+            withAnimation(.easeOut(duration: 0.15)) {
+                showAllColors.toggle()
+            }
+        } label: {
+            Image(systemName: showAllColors ? "chevron.up" : "chevron.down")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.secondary)
+        }
+        .buttonStyle(.plain)
+        // Same footprint as a swatch cell, with a pointing-hand cursor on
+        // hover. The whole cell is the hit area.
+        .frame(width: 28, height: 24)
+        .contentShape(Rectangle())
+        .onHover { hovering in
+            if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+        }
+        .help(L10n.t(showAllColors ? "hint.collapseColors" : "hint.expandColors"))
+    }
+
+    /// One row while collapsed: the light row, or the dark row when the
+/// currently-selected hue lives there, so the selection mark never
+/// disappears behind the hidden row.
+    private func collapsedPaletteColors() -> [String] {
+        let current = store.label(for: bufferedID).colorHex
+        if let index = SpacePalette.colors.firstIndex(of: current),
+            index >= SpacePalette.lightColors.count
+        {
+            return SpacePalette.darkColors
+        }
+        return SpacePalette.lightColors
     }
 
     private func swatch(hex: String) -> some View {

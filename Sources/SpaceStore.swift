@@ -16,7 +16,6 @@ final class SpaceStore: ObservableObject {
     @Published var isRenaming = false
 
     private let labelsKey = "SpaceLabels.v1"
-    private let palette = ["#FF6B6B", "#4ECDC4", "#FFE66D", "#95E1D3", "#C7B8EA", "#FFA07A"]
     private let defaults: UserDefaults
 
     init(defaults: UserDefaults = .standard) {
@@ -42,7 +41,7 @@ final class SpaceStore: ObservableObject {
     @discardableResult
     private func autoAssign(_ id: UInt64) -> SpaceLabel {
         let n = labels.count + 1
-        let color = palette[n % palette.count]
+        let color = SpacePalette.colors[n % SpacePalette.colors.count]
         let label = SpaceLabel(name: "Space \(n)", colorHex: color)
         labels[id] = label
         save()

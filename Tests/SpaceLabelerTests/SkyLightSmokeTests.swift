@@ -28,6 +28,19 @@ final class SkyLightSmokeTests: XCTestCase {
         )
     }
 
+    /// The active Space must map to a "Desktop N" number (its 1-based index
+    /// within its display's user-space list) whenever the system can tell us
+    /// its display. Any failure here breaks the per-row "桌面 N" badge.
+    func test_desktopNumber_forActiveSpace_isNonNil() {
+        guard let current = SkyLight.currentSpaceID() else {
+            return XCTFail("Cannot read current Space ID")
+        }
+        guard let n = SkyLight.desktopNumber(for: current) else {
+            return XCTFail("Active Space has no desktop number — orphaned or API broken")
+        }
+        XCTAssertGreaterThan(n, 0)
+    }
+
     /// The fallback hardware keycodes (used only when the symbolic-hotkey
     /// preferences are unreadable) must mirror the system's default Ctrl+1…9
     /// binding. A past bug swapped desktop 5/6 ('5' is keycode 23, '6' is 22),

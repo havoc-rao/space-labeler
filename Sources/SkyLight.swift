@@ -209,12 +209,24 @@ enum SkyLight {
     ///
     /// Note: only works when the target Space is on the same display as the
     /// currently active one (Ctrl+N always acts on the current display).
+    /// 1-based position of a Space within its display's user-space list —
+    /// the same number the system "Switch to Desktop N" shortcut targets.
+    /// Re-reads the live Mission Control order on every call, so it follows
+    /// manual reordering / display changes immediately. Returns nil when the
+    /// Space is orphaned (no longer managed by any display) or the private
+    /// API is unavailable.
+    static func desktopNumber(for spaceID: UInt64) -> Int? {
+        guard switchSymbolsAvailable,
+            let uuid = displayUUID(for: spaceID)
+        else { return nil }
+        let spaces = userSpaceIDs(onDisplay: uuid)
+        guard let index = spaces.firstIndex(of: spaceID) else { return nil }
+        return index + 1
+    }
+
     static func switchToSpace(id spaceID: UInt64) -> SwitchResult {
         guard switchSymbolsAvailable else { return .unavailable }
-        guard let uuid = displayUUID(for: spaceID) else { return .notFound }
-        let spaces = userSpaceIDs(onDisplay: uuid)
-        guard let index = spaces.firstIndex(of: spaceID) else { return .notFound }
-        let n = index + 1
+        guard let n = desktopNumber(for: spaceID) else { return .notFound }
         guard n <= 9 else { return .indexTooHigh(limit: 9) }
         let shortcuts = desktopShortcuts()
         let combo: (keycode: CGKeyCode, flags: CGEventFlags)

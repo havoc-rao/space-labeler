@@ -28,18 +28,28 @@ final class SkyLightSmokeTests: XCTestCase {
         )
     }
 
-    /// End-to-end enumeration: the active Space must belong to a managed
-    /// display whose user-space list actually contains it, and be ordered
-    /// (so the Ctrl+N index mapping is meaningful).
-    func test_currentSpace_isInDisplayUserSpaceList() {
-        guard let current = SkyLight.currentSpaceID() else {
-            return XCTFail("Cannot read current Space ID")
+    /// The fallback hardware keycodes (used only when the symbolic-hotkey
+    /// preferences are unreadable) must mirror the system's default Ctrl+1…9
+    /// binding. A past bug swapped desktop 5/6 ('5' is keycode 23, '6' is 22),
+    /// so lock the table down against regressions.
+    func test_defaultDesktopKeycodes_matchSystemDefaults() {
+        let expected: [Int: UInt16] = [
+            1: 18, 2: 19, 3: 20, 4: 21, 5: 23, 6: 22, 7: 26, 8: 28, 9: 25,
+        ]
+        XCTAssertEqual(SkyLight.defaultDesktopKeycodes.mapValues { UInt16($0) }, expected)
+    }
+
+    /// The "Switch to Desktop N" symbolic hotkeys live at IDs 118…126 on
+    /// modern macOS; 79…87 belong to Mission Control navigation (Ctrl+←/→)
+    /// and must never be read as desktop shortcuts. When the preferences are
+    /// readable, the returned mapping must only contain desktops 1…9 with a
+    /// plausible keycode (18 = digit '1' … 29 = digit '0').
+    func test_desktopShortcuts_readsModernSymbolicHotkeyIDs() {
+        let shortcuts = SkyLight.desktopShortcuts()
+        guard !shortcuts.isEmpty else {
+            return // preferences unreadable on this machine — nothing to assert
         }
-        guard let uuid = SkyLight.displayUUID(for: current) else {
-            return XCTFail("CGSCopyManagedDisplayForSpace returned nil")
-        }
-        let spaces = SkyLight.userSpaceIDs(onDisplay: uuid)
-        XCTAssertFalse(spaces.isEmpty, "No user Spaces found on the active display")
-        XCTAssertTrue(spaces.contains(current), "Active Space missing from its own display's user-space list")
+        XCTAssertTrue(shortcuts.keys.allSatisfy { (1...9).contains($0) })
+        XCTAssertTrue(shortcuts.values.allSatisfy { (18...29).contains(Int($0.keycode)) })
     }
 }

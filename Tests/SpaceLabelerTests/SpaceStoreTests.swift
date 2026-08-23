@@ -58,15 +58,17 @@ final class SpaceStoreTests: XCTestCase {
 
     func test_autoAssign_rotatesPaletteDeterministically() {
         let store = SpaceStore(defaults: defaults)
-        let palette = ["#FF6B6B", "#4ECDC4", "#FFE66D", "#95E1D3", "#C7B8EA", "#FFA07A"]
 
-        // autoAssign computes n = labels.count + 1 then picks palette[n % palette.count].
-        // Six successive assignments from an empty store yield indices [1,2,3,4,5,0].
-        let expectedIndices = [1, 2, 3, 4, 5, 0]
+        // autoAssign computes n = labels.count + 1 then picks colors[n % count].
+        // Six successive assignments from an empty store cycle through the
+        // palette starting at index 1. Expected values come from the shared
+        // palette itself so this test asserts the rotation behavior, not a
+        // snapshot of specific hex values.
+        let expected = (1...6).map { SpacePalette.colors[$0 % SpacePalette.colors.count] }
 
-        for (i, expectedIdx) in expectedIndices.enumerated() {
+        for (i, expectedColor) in expected.enumerated() {
             let label = store.label(for: UInt64(100 + i))
-            XCTAssertEqual(label.colorHex, palette[expectedIdx], "iteration \(i)")
+            XCTAssertEqual(label.colorHex, expectedColor, "iteration \(i)")
         }
     }
 

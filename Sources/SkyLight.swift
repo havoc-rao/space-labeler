@@ -81,27 +81,62 @@ enum SkyLight {
 
     // MARK: - Shortcut enablement detection
 
-    /// Numbers (1-based) whose "Switch to Desktop N" shortcut is enabled,
-    /// read from the same preferences that back System Settings →
-    /// Keyboard → Keyboard Shortcuts → Mission Control. Empty when
-    /// unreadable. Symbolic hotkey IDs: 79=Desktop 1 … 87=Desktop 9.
-    static func enabledDesktopShortcuts() -> Set<Int> {
+    /// A "Switch to Desktop N" shortcut as configured in System Settings.
+    /// `keycode`/`flags` are read from the same preferences the settings UI
+    /// writes, so custom bindings (e.g. a non-default modifier) are honored.
+    struct DesktopShortcut: Equatable {
+        let desktop: Int
+        let keycode: CGKeyCode
+        let flags: CGEventFlags
+    }
+
+    /// Symbolic hotkey IDs for "Switch to Desktop 1…9" (118…126 on modern
+    /// macOS). Do not use 79…87 — that range covers Mission Control
+    /// navigation (e.g. Ctrl+←/→) and would read the wrong entries.
+    private static let desktopShortcutIDs: [String: Int] = [
+        "118": 1, "119": 2, "120": 3, "121": 4, "122": 5,
+        "123": 6, "124": 7, "125": 8, "126": 9,
+    ]
+
+    /// ANSI hardware keycodes for Ctrl+1…9, used only when the symbolic-hotkey
+    /// preferences cannot be read at all. (Note: '5' is keycode 23, '6' is 22.)
+    static let defaultDesktopKeycodes: [Int: CGKeyCode] = [
+        1: 18, 2: 19, 3: 20, 4: 21, 5: 23, 6: 22, 7: 26, 8: 28, 9: 25,
+    ]
+
+    /// Desktop numbers (1-based) whose "Switch to Desktop N" shortcut is
+    /// enabled, paired with the exact key combination System Settings bound
+    /// to it. Read from the same preferences that back Keyboard →
+    /// Keyboard Shortcuts → Mission Control. Empty when unreadable.
+    static func desktopShortcuts() -> [Int: DesktopShortcut] {
         guard let prefs = UserDefaults(suiteName: "com.apple.symbolichotkeys"),
             let all = prefs.dictionary(forKey: "AppleSymbolicHotKeys")
-        else { return [] }
-        let mapping: [String: Int] = [
-            "79": 1, "80": 2, "81": 3, "82": 4, "83": 5,
-            "84": 6, "85": 7, "86": 8, "87": 9,
-        ]
-        var result = Set<Int>()
-        for (key, desktop) in mapping {
+        else { return [:] }
+        var result: [Int: DesktopShortcut] = [:]
+        for (key, desktop) in desktopShortcutIDs {
             guard let entry = all[key] as? [String: Any],
                 let flag = entry["enabled"] as? Bool,
-                flag
+                flag,
+                let value = entry["value"] as? [String: Any],
+                let params = value["parameters"] as? [Any],
+                params.count >= 3,
+                // parameters = (independent-of-keyboard-type flag, keycode, modifier flags)
+                let keycodeNum = (params[1] as? NSNumber)?.intValue
             else { continue }
-            result.insert(desktop)
+            let flagsNum = (params[2] as? NSNumber)?.intValue ?? 0
+            result[desktop] = DesktopShortcut(
+                desktop: desktop,
+                keycode: CGKeyCode(keycodeNum),
+                flags: CGEventFlags(rawValue: UInt64(flagsNum))
+            )
         }
         return result
+    }
+
+    /// Numbers (1-based) whose "Switch to Desktop N" shortcut is enabled.
+    /// Empty when the preferences are unreadable.
+    static func enabledDesktopShortcuts() -> Set<Int> {
+        Set(desktopShortcuts().keys)
     }
 
     // MARK: - Space switching
@@ -159,10 +194,13 @@ enum SkyLight {
     /// animation, so this is far more robust than any private "move to space"
     /// call — those either don't trigger a real switch or are long gone.
     ///
-    /// The enabled "Switch to Desktop N" set is read from the system shortcut
-    /// preferences: if the target desktop's shortcut is not enabled there,
-    /// we report `.shortcutNotEnabled` instead of sending a dead keystroke.
-    /// If the preferences can't be read, the legacy 1...9 assumption applies.
+    /// The key combination comes straight from the symbolic-hotkey
+    /// preferences: System Settings stores the exact keycode + modifiers for
+    /// each enabled "Switch to Desktop N", so custom bindings work too. If
+    /// the target desktop's shortcut is not enabled there, we report
+    /// `.shortcutNotEnabled` instead of sending a dead keystroke. Only when
+    /// the preferences can't be read at all does the legacy Ctrl+1...9
+    /// assumption apply.
     ///
     /// Requirements:
     /// - The user must enable the shortcuts in System Settings →
@@ -178,13 +216,19 @@ enum SkyLight {
         guard let index = spaces.firstIndex(of: spaceID) else { return .notFound }
         let n = index + 1
         guard n <= 9 else { return .indexTooHigh(limit: 9) }
-        let enabled = enabledDesktopShortcuts()
-        // If the preferences are readable, require the exact shortcut.
-        if !enabled.isEmpty, !enabled.contains(n) {
+        let shortcuts = desktopShortcuts()
+        let combo: (keycode: CGKeyCode, flags: CGEventFlags)
+        if let shortcut = shortcuts[n] {
+            combo = (shortcut.keycode, shortcut.flags)
+        } else if shortcuts.isEmpty, let keycode = defaultDesktopKeycodes[n] {
+            // Preferences unreadable: fall back to the default Ctrl+N binding.
+            combo = (keycode, .maskControl)
+        } else {
+            // Preferences readable, but the target desktop's shortcut is off.
             return .shortcutNotEnabled(desktop: n)
         }
         guard AXIsProcessTrusted() else { return .accessibilityDenied }
-        return postKey(CGKeyCode(17 + n), flags: .maskControl) ? .success : .unavailable
+        return postKey(combo.keycode, flags: combo.flags) ? .success : .unavailable
     }
 
     /// Posts a single key press/release to the system event tap.

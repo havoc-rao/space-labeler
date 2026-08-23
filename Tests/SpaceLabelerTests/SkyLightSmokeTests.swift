@@ -28,17 +28,23 @@ final class SkyLightSmokeTests: XCTestCase {
         )
     }
 
-    /// The active Space must map to a "Desktop N" number (its 1-based index
-    /// within its display's user-space list) whenever the system can tell us
-    /// its display. Any failure here breaks the per-row "桌面 N" badge.
+    /// The active Space must have both a per-display and a global desktop
+    /// number. The global one is what the UI shows as "桌面 N" so it must
+    /// never be nil for a live Space.
     func test_desktopNumber_forActiveSpace_isNonNil() {
         guard let current = SkyLight.currentSpaceID() else {
             return XCTFail("Cannot read current Space ID")
         }
         guard let n = SkyLight.desktopNumber(for: current) else {
-            return XCTFail("Active Space has no desktop number — orphaned or API broken")
+            return XCTFail("Active Space has no per-display desktop number")
         }
         XCTAssertGreaterThan(n, 0)
+        guard let g = SkyLight.globalDesktopNumber(for: current) else {
+            return XCTFail("Active Space has no global desktop number")
+        }
+        XCTAssertGreaterThan(g, 0)
+        // Global number must be >= per-display number (it includes other displays).
+        XCTAssertGreaterThanOrEqual(g, n)
     }
 
     /// The fallback hardware keycodes (used only when the symbolic-hotkey

@@ -268,7 +268,7 @@ struct EditorPopover: View {
             }
             // Live "Desktop N" number (the Ctrl+N shortcut this Space maps
             // to right now). nil for orphaned IDs — show nothing then.
-            if let n = SkyLight.desktopNumber(for: id) {
+            if let n = SkyLight.globalDesktopNumber(for: id) {
                 Text(L10n.t("badge.desktop", n))
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)

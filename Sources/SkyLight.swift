@@ -209,12 +209,10 @@ enum SkyLight {
     ///
     /// Note: only works when the target Space is on the same display as the
     /// currently active one (Ctrl+N always acts on the current display).
-    /// 1-based position of a Space within its display's user-space list —
-    /// the same number the system "Switch to Desktop N" shortcut targets.
-    /// Re-reads the live Mission Control order on every call, so it follows
-    /// manual reordering / display changes immediately. Returns nil when the
-    /// Space is orphaned (no longer managed by any display) or the private
-    /// API is unavailable.
+    /// 1-based position of a Space within its **own** display's user-space list.
+    /// This is the number the system "Switch to Desktop N" shortcut targets
+    /// on that specific display (Ctrl+N is always per-display).
+    /// Returns nil for orphaned Spaces or when the private API is unavailable.
     static func desktopNumber(for spaceID: UInt64) -> Int? {
         guard switchSymbolsAvailable,
             let uuid = displayUUID(for: spaceID)
@@ -222,6 +220,44 @@ enum SkyLight {
         let spaces = userSpaceIDs(onDisplay: uuid)
         guard let index = spaces.firstIndex(of: spaceID) else { return nil }
         return index + 1
+    }
+
+    /// Global 1-based desktop number across **all** displays concatenated in
+    /// a stable order (physical display IDs ascending, then "Main").
+    /// Use this for UI labels so "桌面 1…N" are unique even on multi-monitor
+    /// setups — unlike `desktopNumber(for:)` which resets to 1 per display.
+    static func globalDesktopNumber(for spaceID: UInt64) -> Int? {
+        guard switchSymbolsAvailable else { return nil }
+        // Build a stable ordered list of all managed display UUIDs.
+        var displayOrder: [String] = []
+        // Physical displays first (stable by CGDisplayID).
+        let seen = NSMutableSet()
+        var maxDisplays: UInt32 = 0
+        _ = CGGetOnlineDisplayList(0, nil, &maxDisplays)
+        var ids = [UInt32](repeating: 0, count: Int(maxDisplays))
+        _ = CGGetOnlineDisplayList(maxDisplays, &ids, &maxDisplays)
+        for displayID in ids {
+            guard let uuidRaw = CGDisplayCreateUUIDFromDisplayID(displayID),
+                  let uuidStr = CFUUIDCreateString(kCFAllocatorDefault, uuidRaw.takeRetainedValue()) as String?,
+                  !seen.contains(uuidStr)
+            else { continue }
+            seen.add(uuidStr)
+            displayOrder.append(uuidStr)
+        }
+        // "Main" (logical main-display concept) last if not already present.
+        if !seen.contains("Main") {
+            displayOrder.append("Main")
+        }
+        // Concatenate user-space IDs in display order, find global index.
+        var offset = 0
+        for uuid in displayOrder {
+            let spaces = userSpaceIDs(onDisplay: uuid)
+            if let idx = spaces.firstIndex(of: spaceID) {
+                return offset + idx + 1
+            }
+            offset += spaces.count
+        }
+        return nil
     }
 
     static func switchToSpace(id spaceID: UInt64) -> SwitchResult {

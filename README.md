@@ -20,6 +20,14 @@ Website: https://neonwatty.github.io/space-labeler/
 
 ## Install
 
+### Prebuilt downloads (recommended)
+
+Grab `SpaceLabeler-<version>-macos.zip` from [GitHub Releases](https://github.com/havoc-rao/space-labeler/releases/latest) — a universal binary for both Apple Silicon and Intel. Unzip, move `SpaceLabeler.app` into `/Applications` (or `~/Applications`), and open it.
+
+Because builds are ad-hoc signed and not notarized, macOS may warn "cannot verify the developer" on first launch — Control-click the app and choose **Open** (or run `xattr -dr com.apple.quarantine /Applications/SpaceLabeler.app`). From then on the app can check for and install updates on its own (see [Updates](#updates)) — no need to build from source again.
+
+### Build from source
+
 ```sh
 git clone https://github.com/neonwatty/space-labeler.git
 cd space-labeler
@@ -68,6 +76,12 @@ Preferences also includes a **Language** picker (中文 by default, English avai
 
 Labels and colors persist across reboots in `UserDefaults` under the key `SpaceLabels.v1`.
 
+### Updates
+
+On launch the app silently checks for a new release (at most once per day). Open **Preferences…** → **UPDATES** to run a manual "Check for Updates…" at any time; when a new version is found, hit **Download & Restart** and the app quits, replaces itself in place, and relaunches.
+
+Note: every build carries a fresh ad-hoc signature, so macOS may reset the Accessibility grant — if jumping (Ctrl+N) stops working after an update, re-enable Space Labeler in System Settings → Privacy & Security → Accessibility. The update source repo is configured in one constant, `UpdaterConfig.repo` in `Sources/Updater.swift`, so it's easy to change if the repository moves.
+
 ## Development
 
 ```sh
@@ -88,6 +102,17 @@ swift-format lint --recursive Sources Tests
 ```
 
 The Xcode project file (`SpaceLabeler.xcodeproj`) is gitignored — the source of truth is `project.yml`. Always run `xcodegen generate` (or `make build`, which does it for you) after cloning or after editing `project.yml`.
+
+### Cutting a release
+
+```sh
+# 1. Bump the VERSION file (e.g. 0.2.0) and commit
+# 2. Tag and push
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+`.github/workflows/release.yml` builds a universal (arm64 + x86_64) Release on macOS, packages it as a zip, and publishes it to a GitHub Release (the tag must match the VERSION file or the workflow errors out; the same workflow can also be run manually from the Actions tab, publishing `v$(VERSION)`). The in-app update check pulls from these Releases.
 
 ## Notes on the private API
 

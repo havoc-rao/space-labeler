@@ -1,8 +1,12 @@
+import AppKit
 import SwiftUI
 
 /// Preferences shown when "Preferences…" is clicked in the main popover.
 /// Kept out of the main Space list so it stays compact.
 struct SettingsView: View {
+    /// Update checks and the download-and-restart flow.
+    @ObservedObject var updater: UpdaterState
+
     /// Called when the user navigates back to the main popover.
     var onDone: () -> Void
 
@@ -25,6 +29,7 @@ struct SettingsView: View {
             Divider()
 
             languageSection
+            updateSection
             statusSection
 
             Spacer(minLength: 0)
@@ -94,6 +99,114 @@ struct SettingsView: View {
             RoundedRectangle(cornerRadius: 8)
                 .fill(Color.white.opacity(0.055))
         )
+    }
+
+    /// Checks GitHub Releases for a newer build, offers Download & Restart.
+    private var updateSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(L10n.t("settings.updates"))
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(0.6)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                if updater.isChecking {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+                Button(L10n.t("settings.checkForUpdates")) {
+                    Task { await updater.checkForUpdates() }
+                }
+                .buttonStyle(.plain)
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
+                .disabled(updater.isChecking)
+            }
+
+            HStack(spacing: 8) {
+                Text(L10n.t("settings.currentVersion"))
+                    .font(.system(size: 12))
+                Spacer()
+                Text("v\(UpdaterState.currentVersion)")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+
+            updateStatus
+
+            if let latest = updater.latestVersion, latest > UpdaterState.currentVersion {
+                HStack {
+                    Button {
+                        confirmAndDownload(version: latest)
+                    } label: {
+                        if updater.isDownloading {
+                            HStack(spacing: 6) {
+                                ProgressView()
+                                    .controlSize(.small)
+                                Text(L10n.t("settings.downloading", "v\(latest)"))
+                            }
+                        } else {
+                            Text(L10n.t("settings.downloadUpdate"))
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .font(.system(size: 11))
+                    .disabled(updater.isDownloading)
+                    Spacer()
+                }
+                .padding(.top, 2)
+            }
+        }
+        .padding(11)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.white.opacity(0.055))
+        )
+    }
+
+    @ViewBuilder
+    private var updateStatus: some View {
+        switch updater.state {
+        case .checking:
+            Text(L10n.t("settings.checking"))
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+        case .upToDate:
+            Text(L10n.t("settings.upToDate"))
+                .font(.system(size: 11))
+                .foregroundStyle(.green)
+        case .updateAvailable(let version):
+            Text(L10n.t("settings.updateAvailable", "v\(version)"))
+                .font(.system(size: 11))
+                .foregroundStyle(.green)
+        case .applying:
+            Text(L10n.t("settings.applying"))
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+        case .failed(let message):
+            Text(L10n.t("settings.updateFailed", message))
+                .font(.system(size: 11))
+                .foregroundStyle(.red)
+                .fixedSize(horizontal: false, vertical: true)
+        case .idle:
+            EmptyView()
+        }
+    }
+
+    /// Confirmation before quitting the app to swap in the new build. The ad-hoc
+    /// signature changes on every build, so macOS may reset the Accessibility
+    /// grant — the message tells the user how to re-enable it if jumping stops
+    /// working after the update.
+    private func confirmAndDownload(version: AppVersion) {
+        let alert = NSAlert()
+        alert.messageText = L10n.t("settings.updatePromptTitle")
+        alert.informativeText = L10n.t("settings.updatePromptMessage", "v\(version)")
+        alert.addButton(withTitle: L10n.t("settings.updatePromptDownload"))
+        alert.addButton(withTitle: L10n.t("settings.updatePromptCancel"))
+        alert.alertStyle = .informational
+        if alert.runModal() == .alertFirstButtonReturn {
+            updater.downloadAndInstallLatest()
+        }
     }
 
     private var statusSection: some View {

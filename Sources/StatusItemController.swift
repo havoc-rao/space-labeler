@@ -9,6 +9,7 @@ final class StatusItemController {
     private let popover: NSPopover
     private let monitor: SpaceMonitor
     private let store: SpaceStore
+    private let updater = UpdaterState()
     private var cancellables = Set<AnyCancellable>()
 
     /// System-wide ^⇧↑ hotkey, registered via Carbon. Unlike NSEvent global
@@ -48,9 +49,11 @@ final class StatusItemController {
         popover.behavior = .transient
         popover.contentSize = NSSize(width: 290, height: 430)
         popover.contentViewController = NSHostingController(
-            rootView: EditorPopover(monitor: monitor, store: store, onJump: { [weak self] in
-                self?.popover.performClose(nil)
-            })
+            rootView: EditorPopover(
+                monitor: monitor, store: store, updater: updater,
+                onJump: { [weak self] in
+                    self?.popover.performClose(nil)
+                })
         )
 
         statusItem.button?.target = self
@@ -78,6 +81,10 @@ final class StatusItemController {
             .store(in: &cancellables)
 
         installHotKeys()
+
+        // Silently check for a new release (at most once per day); the result
+        // shows up in Preferences → Updates.
+        updater.autoCheckIfDue()
     }
 
     deinit {

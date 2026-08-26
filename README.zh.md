@@ -20,6 +20,14 @@ macOS 本身不支持为 Spaces 命名——而 `TotalSpaces2` 又因 Apple 的 
 
 ## 安装
 
+### 直接下载（推荐）
+
+从 [GitHub Releases](https://github.com/havoc-rao/space-labeler/releases/latest) 下载 `SpaceLabeler-<版本>-macos.zip`（通用二进制，同时支持 Apple Silicon 与 Intel），解压后将 `SpaceLabeler.app` 移入 `/Applications`（或 `~/Applications`）并打开。
+
+由于采用 ad-hoc 签名且未经公证，首次启动时 macOS 可能提示「无法验证开发者」——右键点按应用 →「打开」即可（或者终端执行 `xattr -dr com.apple.quarantine /Applications/SpaceLabeler.app`）。之后应用可以自行检查并安装更新（见[更新](#更新)），无需再从源码构建。
+
+### 从源码构建
+
 ```sh
 git clone https://github.com/neonwatty/space-labeler.git
 cd space-labeler
@@ -68,6 +76,12 @@ rm ~/Library/LaunchAgents/com.jeremywatt.SpaceLabeler.plist
 
 标签与颜色在重启后仍会保留，存储在 `UserDefaults` 的 `SpaceLabels.v1` 键下。
 
+### 更新
+
+应用启动时会静默检查一次更新（每天最多一次）。打开 **Preferences…** → **更新** 区块，可随时手动「检查更新…」；发现新版本后点击「下载并重启」，应用会退出、用新版本替换自身并自动重新启动。
+
+注意：每次构建都是新的 ad-hoc 签名，macOS 可能因此重置辅助功能授权——若更新后跳转（Ctrl+N）失效，请到「系统设置 → 隐私与安全性 → 辅助功能」重新开启 Space Labeler。更新源仓库在 `Sources/Updater.swift` 的 `UpdaterConfig.repo` 中配置，仓库迁移时只需改这一处。
+
 ## 开发
 
 ```sh
@@ -88,6 +102,17 @@ swift-format lint --recursive Sources Tests
 ```
 
 Xcode 工程文件（`SpaceLabeler.xcodeproj`）已被 gitignore——真正的源头是 `project.yml`。克隆仓库后或修改 `project.yml` 后，务必先运行 `xcodegen generate`（`make build` 会自动执行）。
+
+### 发布新版本
+
+```sh
+# 1. 修改 VERSION 文件（如 0.2.0）并提交
+# 2. 打 tag 并推送
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+`.github/workflows/release.yml` 会在 macOS 上构建通用（arm64 + x86_64）Release 包、打包成 zip 并发布到 GitHub Release（tag 必须与 VERSION 文件一致，否则 workflow 会报错；也可以在 Actions 页面手动触发同一个 workflow，它会按 VERSION 发布）。应用内置的更新检查即拉取这些 Release。
 
 ## 关于私有 API 的说明
 

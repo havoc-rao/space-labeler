@@ -58,28 +58,52 @@ enum L10n {
         "help.clickToSwitch": "Click to switch to this Space",
         "error.notFound": "This Space is not on the current display's desktop sequence and can't be jumped to",
         "error.indexTooHigh": "Space number exceeds %d — not supported by system shortcuts",
-        "error.accessibility": "Accessibility permission required: System Settings → Privacy & Security → Accessibility → enable Space Labeler (restart the app if you just enabled it)",
-        "error.shortcutNotEnabled": "Desktop %d's shortcut is not enabled — check “Switch to Desktop %d” in System Settings → Keyboard → Keyboard Shortcuts → Mission Control",
-        "error.unavailable": "Jump unavailable: private API resolution failed, or the system “Switch to Desktop N” shortcuts are not enabled",
+        "error.accessibility":
+            "Accessibility permission required: System Settings → Privacy & Security → Accessibility → enable Space Labeler (restart the app if you just enabled it)",
+        "error.shortcutNotEnabled":
+            "Desktop %d's shortcut is not enabled — check “Switch to Desktop %d” in System Settings → Keyboard → Keyboard Shortcuts → Mission Control",
+        "error.unavailable":
+            "Jump unavailable: private API resolution failed, or the system “Switch to Desktop N” shortcuts are not enabled",
 
         // Environment self-check (SettingsView)
         "settings.status": "STATUS",
         "settings.accessibility": "Accessibility permission",
         "settings.granted": "Granted",
-        "settings.notGranted": "Not granted — enable it in Privacy & Security → Accessibility. If you just did, quit and relaunch the app.",
+        "settings.notGranted":
+            "Not granted — enable it in Privacy & Security → Accessibility. If you just did, quit and relaunch the app.",
         "settings.shortcutTitle": "Desktop switch shortcuts",
-        "settings.shortcutHint": "Enable the “Switch to Desktop 1…9” shortcuts you need in System Settings → Keyboard → Keyboard Shortcuts → Mission Control.",
+        "settings.shortcutHint":
+            "Enable the “Switch to Desktop 1…9” shortcuts you need in System Settings → Keyboard → Keyboard Shortcuts → Mission Control.",
         "settings.refresh": "Refresh",
         "settings.requestPermission": "Request permission…",
-        "settings.requestPermissionHint": "Triggers the system authorization dialog (only shown when the permission is not granted).",
+        "settings.requestPermissionHint":
+            "Triggers the system authorization dialog (only shown when the permission is not granted).",
         "settings.digitsLabel": "Ctrl+N desktop shortcuts",
         "settings.digitsValueNone": "None enabled — enable “Switch to Desktop 1…9”",
-        "settings.selfCheckHint": "Jumping posts Ctrl+N — the Accessibility permission and the target desktop's “Switch to Desktop N” shortcut must both be enabled, and the target Space must be on the current display.",
+        "settings.selfCheckHint":
+            "Jumping posts Ctrl+N — the Accessibility permission and the target desktop's “Switch to Desktop N” shortcut must both be enabled, and the target Space must be on the current display.",
 
         // SettingsView
         "settings.back": "Back",
         "settings.title": "SETTINGS",
         "settings.language": "Language",
+
+        // Updates (SettingsView)
+        "settings.updates": "UPDATES",
+        "settings.currentVersion": "Current version",
+        "settings.checkForUpdates": "Check for Updates…",
+        "settings.checking": "Checking…",
+        "settings.upToDate": "You're on the latest version",
+        "settings.updateAvailable": "New version v%@ available",
+        "settings.downloadUpdate": "Download & Restart",
+        "settings.downloading": "Downloading v%@…",
+        "settings.applying": "Applying update…",
+        "settings.updateFailed": "Update check failed: %@",
+        "settings.updatePromptTitle": "New version available",
+        "settings.updatePromptMessage":
+            "v%@ is ready to install. The app will quit, replace itself and relaunch.\n\nNote: this build is ad-hoc signed, so macOS may reset the Accessibility permission. If jumping (Ctrl+N) stops working afterwards, re-enable Space Labeler in System Settings → Privacy & Security → Accessibility.",
+        "settings.updatePromptDownload": "Download & Restart",
+        "settings.updatePromptCancel": "Cancel",
     ]
 
     private static let zhTable: [String: String] = [
@@ -123,5 +147,22 @@ enum L10n {
         "settings.back": "返回",
         "settings.title": "设置",
         "settings.language": "语言",
+
+        // Updates (SettingsView)
+        "settings.updates": "更新",
+        "settings.currentVersion": "当前版本",
+        "settings.checkForUpdates": "检查更新…",
+        "settings.checking": "正在检查…",
+        "settings.upToDate": "已是最新版本",
+        "settings.updateAvailable": "发现新版本 v%@",
+        "settings.downloadUpdate": "下载并重启",
+        "settings.downloading": "正在下载 v%@…",
+        "settings.applying": "正在应用更新…",
+        "settings.updateFailed": "检查更新失败：%@",
+        "settings.updatePromptTitle": "发现新版本",
+        "settings.updatePromptMessage":
+            "v%@ 已就绪，应用将退出、替换自身并重新启动。\n\n注意：本应用为 ad-hoc 签名，更新后 macOS 可能重置辅助功能权限。若跳转（Ctrl+N）失效，请重新在「系统设置 → 隐私与安全性 → 辅助功能」中开启 Space Labeler。",
+        "settings.updatePromptDownload": "下载并重启",
+        "settings.updatePromptCancel": "取消",
     ]
 }

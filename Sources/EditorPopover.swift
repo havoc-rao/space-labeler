@@ -4,6 +4,7 @@ import SwiftUI
 struct EditorPopover: View {
     @ObservedObject var monitor: SpaceMonitor
     @ObservedObject var store: SpaceStore
+    @ObservedObject var updater: UpdaterState
 
     /// Called after a successful jump so the host can close the popover.
     var onJump: (() -> Void)?
@@ -51,7 +52,7 @@ struct EditorPopover: View {
     var body: some View {
         Group {
             if showSettings {
-                SettingsView(onDone: { showSettings = false })
+                SettingsView(updater: updater, onDone: { showSettings = false })
             } else {
                 mainContent
             }

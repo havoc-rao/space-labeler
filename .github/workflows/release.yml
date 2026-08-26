@@ -1,0 +1,106 @@
+name: Release
+
+# Builds a universal (Apple Silicon + Intel) Release of SpaceLabeler and
+# publishes it to a GitHub Release, where the in-app updater and other
+# machines pick it up.
+#
+# Two ways to trigger:
+#   - push a tag `vX.Y.Z` (must match the VERSION file — single source of
+#     truth), or
+#   - run the workflow manually from the Actions tab; it publishes v$(VERSION).
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-release:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Select latest Xcode
+        run: sudo xcode-select -s "$(ls -1d /Applications/Xcode_*.app | sort -V | tail -1)/Contents/Developer"
+
+      - name: Install dependencies
+        run: brew install xcodegen
+
+      - name: Validate version and tag
+        run: |
+          VERSION="$(cat VERSION)"
+          if [ "${{ github.ref_type }}" = "tag" ] && [ "${GITHUB_REF_NAME#v}" != "$VERSION" ]; then
+            echo "::error::Tag '${{ github.ref_name }}' does not match VERSION file ('$VERSION'). Bump VERSION and re-tag."
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "BUILD_NUMBER=$(git rev-list --count HEAD)" >> "$GITHUB_ENV"
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build Release (universal)
+        run: |
+          xcodebuild build \
+            -project SpaceLabeler.xcodeproj \
+            -scheme SpaceLabeler \
+            -configuration Release \
+            -destination 'platform=macOS' \
+            -derivedDataPath build \
+            MARKETING_VERSION=${{ env.VERSION }} \
+            CURRENT_PROJECT_VERSION=${{ env.BUILD_NUMBER }} \
+            ARCHS="arm64 x86_64" \
+            ONLY_ACTIVE_ARCH=NO \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_REQUIRED=NO
+
+      - name: Verify universal binary
+        run: |
+          ARCHS="$(lipo -archs build/Build/Products/Release/SpaceLabeler.app/Contents/MacOS/SpaceLabeler)"
+          echo "Architectures: $ARCHS"
+          echo "$ARCHS" | grep -q arm64
+          echo "$ARCHS" | grep -q x86_64
+
+      - name: Package app
+        run: |
+          cd build/Build/Products/Release
+          /usr/bin/ditto -c -k --keepParent SpaceLabeler.app "SpaceLabeler-${{ env.VERSION }}-macos.zip"
+          echo "SHA256=$(shasum -a 256 'SpaceLabeler-${{ env.VERSION }}-macos.zip' | awk '{print $1}')" >> "$GITHUB_ENV"
+
+      - name: Generate release notes
+        run: |
+          git fetch --tags --force
+          PREV="$(git for-each-ref --sort=-creatordate --format='%(refname:short)' refs/tags | grep -v "^${{ github.ref_name }}$" | head -1 || true)"
+          RANGE="HEAD"
+          [ -n "$PREV" ] && RANGE="$PREV..HEAD"
+          {
+            echo "Universal (Apple Silicon + Intel) build for macOS 13+."
+            echo ""
+            echo "**SHA256**: \`${{ env.SHA256 }}\`"
+            echo ""
+            echo "### Changes"
+            git log --oneline --no-merges "$RANGE" || echo "(no commits)"
+            echo ""
+            echo "### Install"
+            echo "1. Unzip and copy SpaceLabeler.app to /Applications or ~/Applications."
+            echo "2. If macOS warns about the unidentified developer, Control-click the app and choose Open (ad-hoc signed builds are not notarized)."
+            echo "3. Grant Accessibility permission under System Settings → Privacy & Security → Accessibility so jumping (Ctrl+N) works."
+          } > release-notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.VERSION }}
+          name: SpaceLabeler v${{ env.VERSION }}
+          body_path: release-notes.md
+          files: build/Build/Products/Release/SpaceLabeler-${{ env.VERSION }}-macos.zip
+          fail_on_unmatched_files: true

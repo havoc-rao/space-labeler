@@ -26,8 +26,27 @@ struct EditorPopover: View {
     /// Whether the full 12-color palette is expanded (default: one row).
     @State private var showAllColors = false
     @State private var keyObserver: NSObjectProtocol?
+    /// Live "Desktop N" number per Space ID, refreshed when the popover
+    /// opens and when the active Space changes. nil when the private API is
+    /// unavailable — the list then falls back to ID order and pruning is
+    /// skipped, so nothing is ever removed blindly.
+    @State private var desktopNumbers: [UInt64: Int]?
 
-    private var sortedIDs: [UInt64] { store.labels.keys.sorted() }
+    /// Space rows in 桌面 1, 2, 3… order (global desktop number across all
+    /// displays). Spaces whose "Desktop N" number is gone — deleted Spaces,
+    /// abandoned fullscreen sessions — are dropped: they're not live
+    /// desktops anymore. When the numbering API is unavailable, fall back
+    /// to ID order with no badge so the list still works.
+    private var rows: [(id: UInt64, desktop: Int)] {
+        guard let desktopNumbers else {
+            return store.labels.keys.sorted().map { ($0, 0) }
+        }
+        return store.labels.keys
+            .compactMap { id in desktopNumbers[id].map { (id, $0) } }
+            .sorted { $0.desktop < $1.desktop }
+    }
+
+    private var sortedIDs: [UInt64] { rows.map(\.id) }
 
     var body: some View {
         Group {
@@ -39,8 +58,9 @@ struct EditorPopover: View {
         }
         .frame(width: 290)
         .onAppear {
+            refreshDesktopNumbers()
             syncBuffer()
-            selectedID = monitor.currentSpaceID
+            selectedID = defaultSelectedID
             hoveredID = nil
             pendingDeleteID = nil
             installKeyMonitor()
@@ -50,7 +70,10 @@ struct EditorPopover: View {
             removeKeyMonitor()
             removeKeyObserver()
         }
-        .onChange(of: monitor.currentSpaceID) { _ in syncBuffer() }
+        .onChange(of: monitor.currentSpaceID) { _ in
+            refreshDesktopNumbers()
+            syncBuffer()
+        }
     }
 
     private var mainContent: some View {
@@ -93,6 +116,30 @@ struct EditorPopover: View {
     private func syncBuffer() {
         bufferedID = monitor.currentSpaceID
         nameBuffer = store.label(for: monitor.currentSpaceID).name
+    }
+
+    /// Re-reads the live "Desktop N" numbering and prunes labels whose Space
+    /// no longer has one (deleted Spaces, abandoned fullscreen sessions).
+    /// The active Space's label is always kept so the current card never
+    /// churns. When the private API is unavailable the map stays nil and
+    /// nothing is pruned.
+    private func refreshDesktopNumbers() {
+        desktopNumbers = SkyLight.globalDesktopNumbers()
+        if let numbers = desktopNumbers {
+            var valid = Set(numbers.keys)
+            valid.insert(monitor.currentSpaceID)
+            store.prune(keeping: valid)
+        }
+    }
+
+    /// The row keyboard navigation should default to: the current Space when
+    /// it appears in the list, otherwise the first row (the current Space may
+    /// be a fullscreen app Space with no 桌面 number and no row of its own).
+    private var defaultSelectedID: UInt64 {
+        if rows.contains(where: { $0.id == monitor.currentSpaceID }) {
+            return monitor.currentSpaceID
+        }
+        return rows.first?.id ?? monitor.currentSpaceID
     }
 
     /// "v0.1.0 (1)" — marketing version and build number from the bundle.
@@ -234,9 +281,9 @@ struct EditorPopover: View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(spacing: 1) {
-                    ForEach(sortedIDs, id: \.self) { id in
-                        spaceRow(id: id)
-                            .id(id)
+                    ForEach(rows, id: \.id) { row in
+                        spaceRow(id: row.id, desktop: row.desktop)
+                            .id(row.id)
                     }
                 }
             }
@@ -249,7 +296,7 @@ struct EditorPopover: View {
         }
     }
 
-    private func spaceRow(id: UInt64) -> some View {
+    private func spaceRow(id: UInt64, desktop: Int) -> some View {
         let label = store.labels[id] ?? SpaceLabel(name: "?", colorHex: "#888888")
         let isCurrent = id == monitor.currentSpaceID
         let isSelected = id == selectedID
@@ -267,9 +314,10 @@ struct EditorPopover: View {
                     .foregroundStyle(.secondary)
             }
             // Live "Desktop N" number (the Ctrl+N shortcut this Space maps
-            // to right now). nil for orphaned IDs — show nothing then.
-            if let n = SkyLight.globalDesktopNumber(for: id) {
-                Text(L10n.t("badge.desktop", n))
+            // to right now). 0 when the numbering API is unavailable —
+            // show nothing then.
+            if desktop > 0 {
+                Text(L10n.t("badge.desktop", desktop))
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
                     .monospacedDigit()
@@ -431,18 +479,21 @@ struct EditorPopover: View {
             syncBuffer()
         }
         if id == selectedID {
-            selectedID = monitor.currentSpaceID
+            selectedID = defaultSelectedID
         }
         pendingDeleteID = nil
     }
 
+    /// ↑/↓ moves the selection through the Space list, wrapping around at
+    /// both ends: ↑ on the first row lands on the last one, ↓ on the last
+    /// row lands on the first one (head-to-tail continuation).
     private func moveSelection(_ delta: Int) {
         guard !sortedIDs.isEmpty else { return }
         guard let current = selectedID, let index = sortedIDs.firstIndex(of: current) else {
-            selectedID = monitor.currentSpaceID
+            selectedID = defaultSelectedID
             return
         }
-        let newIndex = min(max(index + delta, 0), sortedIDs.count - 1)
+        let newIndex = (index + delta + sortedIDs.count) % sortedIDs.count
         selectedID = sortedIDs[newIndex]
     }
 

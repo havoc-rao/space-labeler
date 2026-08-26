@@ -45,6 +45,15 @@ final class SkyLightSmokeTests: XCTestCase {
         XCTAssertGreaterThan(g, 0)
         // Global number must be >= per-display number (it includes other displays).
         XCTAssertGreaterThanOrEqual(g, n)
+        // The bulk map (which the Space list sorts by) must agree with the
+        // per-ID lookup.
+        let numbers = SkyLight.globalDesktopNumbers()
+        XCTAssertNotNil(numbers, "Bulk desktop-number map must be available when the switch symbols resolve")
+        XCTAssertEqual(numbers?[current], g)
+        XCTAssertEqual(
+            numbers?.filter { $0.value == g }.count, 1,
+            "Every desktop number must be unique across all displays"
+        )
     }
 
     /// The fallback hardware keycodes (used only when the symbolic-hotkey

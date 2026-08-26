@@ -38,6 +38,17 @@ final class SpaceStore: ObservableObject {
         save()
     }
 
+    /// Removes labels for Space IDs not in `validIDs` — e.g. desktops that
+    /// no longer exist or lost their "Desktop N" slot. Persists only when
+    /// something was actually removed.
+    func prune(keeping validIDs: Set<UInt64>) {
+        let filtered = labels.filter { validIDs.contains($0.key) }
+        if filtered.count != labels.count {
+            labels = filtered
+            save()
+        }
+    }
+
     @discardableResult
     private func autoAssign(_ id: UInt64) -> SpaceLabel {
         let n = labels.count + 1

@@ -79,4 +79,39 @@ final class SpaceStoreTests: XCTestCase {
 
         XCTAssertTrue(store.labels.isEmpty, "Store should come up empty when defaults are corrupted, not crash")
     }
+
+    func test_prune_removesOrphanedLabelsAndPersists() {
+        let store1 = SpaceStore(defaults: defaults)
+        store1.update(10, SpaceLabel(name: "Work", colorHex: "#111111"))
+        store1.update(20, SpaceLabel(name: "Stale", colorHex: "#222222"))
+        store1.update(30, SpaceLabel(name: "Play", colorHex: "#333333"))
+
+        store1.prune(keeping: [10, 30])
+
+        XCTAssertNil(store1.labels[20], "Orphaned label should be removed")
+        XCTAssertEqual(store1.labels[10]?.name, "Work")
+        XCTAssertEqual(store1.labels[30]?.name, "Play")
+
+        let store2 = SpaceStore(defaults: defaults)
+        XCTAssertNil(store2.labels[20], "Prune must persist")
+        XCTAssertEqual(store2.labels.count, 2)
+    }
+
+    func test_prune_withAllValidIDs_keepsEverything() {
+        let store = SpaceStore(defaults: defaults)
+        store.update(10, SpaceLabel(name: "A", colorHex: "#111111"))
+        store.update(20, SpaceLabel(name: "B", colorHex: "#222222"))
+
+        store.prune(keeping: [10, 20, 999])
+
+        XCTAssertEqual(store.labels.count, 2)
+        XCTAssertNotNil(store.labels[10])
+        XCTAssertNotNil(store.labels[20])
+    }
+
+    func test_prune_emptyStore_isNoOp() {
+        let store = SpaceStore(defaults: defaults)
+        store.prune(keeping: [1, 2, 3])
+        XCTAssertTrue(store.labels.isEmpty)
+    }
 }

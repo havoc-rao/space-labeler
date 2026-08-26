@@ -227,6 +227,14 @@ enum SkyLight {
     /// Use this for UI labels so "桌面 1…N" are unique even on multi-monitor
     /// setups — unlike `desktopNumber(for:)` which resets to 1 per display.
     static func globalDesktopNumber(for spaceID: UInt64) -> Int? {
+        globalDesktopNumbers()?[spaceID]
+    }
+
+    /// Maps every user Space ID on every managed display to its global
+    /// 1-based desktop number, using the same display order as
+    /// `globalDesktopNumber(for:)`. Returns nil when the private API is
+    /// unavailable, so callers can distinguish "no data" from "no Spaces".
+    static func globalDesktopNumbers() -> [UInt64: Int]? {
         guard switchSymbolsAvailable else { return nil }
         // Build a stable ordered list of all managed display UUIDs.
         var displayOrder: [String] = []
@@ -248,16 +256,17 @@ enum SkyLight {
         if !seen.contains("Main") {
             displayOrder.append("Main")
         }
-        // Concatenate user-space IDs in display order, find global index.
+        // Concatenate user-space IDs in display order.
+        var result: [UInt64: Int] = [:]
         var offset = 0
         for uuid in displayOrder {
             let spaces = userSpaceIDs(onDisplay: uuid)
-            if let idx = spaces.firstIndex(of: spaceID) {
-                return offset + idx + 1
+            for (index, spaceID) in spaces.enumerated() {
+                result[spaceID] = offset + index + 1
             }
             offset += spaces.count
         }
-        return nil
+        return result
     }
 
     static func switchToSpace(id spaceID: UInt64) -> SwitchResult {

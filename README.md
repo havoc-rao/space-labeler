@@ -66,6 +66,10 @@ Click any Space in the "All Spaces" list to jump straight to it. Jumping synthes
 
 The list shows the desktop's order (1, 2, 3…) as Mission Control sees it, so the mapping is automatic. Spaces beyond the 9th desktop can't be jumped to directly — use `Ctrl+←` / `Ctrl+→` for those. If a required permission or shortcut is missing, the popover shows the same path inline (设置 → 隐私与安全 → 辅助功能 → 打开 Space Labeler) instead of failing silently.
 
+### Filtering Spaces
+
+When the popover opens, focus stays on the "All Spaces" list (`↑`/`↓`/`⏎` work immediately). Press `⌘F` (or click the search bar above the list) to move focus into the filter field: type and the list filters live — matching the label name or the desktop number (e.g. `3`), with matched fragments bolded and the match count shown on the right. While filtering, `↑`/`↓` keep moving through the narrowed list and `⏎` jumps to the selected Space; `Esc` clears the filter first, then leaves the search bar back to the list. The search bar is a flat rounded "pill" (magnifier icon, clear ✕) — deliberately distinct from the beveled "Space name" field in the Current Space card.
+
 ### Direct jumps (Ctrl+N)
 
 Jumping posts a single "Switch to Desktop N" shortcut (`Ctrl+N`). SpaceLabeler automatically reads which desktop shortcuts are actually enabled on this machine: if the target desktop's shortcut isn't checked, you get a precise message ("Desktop N's shortcut is not enabled — check it in Mission Control") instead of a dead keystroke.

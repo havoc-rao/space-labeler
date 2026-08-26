@@ -32,6 +32,16 @@ struct EditorPopover: View {
     /// unavailable — the list then falls back to ID order and pruning is
     /// skipped, so nothing is ever removed blindly.
     @State private var desktopNumbers: [UInt64: Int]?
+    /// Live filter typed into the search field; rows that don't match drop
+    /// out of the list.
+    @State private var searchText: String = ""
+    /// Whether the search field currently owns keyboard input. While it
+    /// does, ↑/↓/⏎ steer the (filtered) list and ordinary typing passes
+    /// through to filter live.
+    @State private var searchActive = false
+    /// Monotonic token bumped when the popover opens; the search field
+    /// reacts by grabbing focus so typing filters immediately.
+    @State private var searchFocusToken = 0
 
     /// Space rows in 桌面 1, 2, 3… order (global desktop number across all
     /// displays). Spaces whose "Desktop N" number is gone — deleted Spaces,
@@ -47,7 +57,27 @@ struct EditorPopover: View {
             .sorted { $0.desktop < $1.desktop }
     }
 
-    private var sortedIDs: [UInt64] { rows.map(\.id) }
+    /// Whitespace-trimmed search query.
+    private var trimmedQuery: String {
+        searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Rows after applying the search filter. Matching covers the label
+    /// name and the live desktop number, so "3" or part of a name both
+    /// narrow the list; a blank query shows everything.
+    private var visibleRows: [(id: UInt64, desktop: Int)] {
+        let query = trimmedQuery
+        guard !query.isEmpty else { return rows }
+        return rows.filter { row in
+            SpaceFilter.matches(
+                name: store.labels[row.id]?.name ?? "",
+                desktop: row.desktop,
+                query: query
+            )
+        }
+    }
+
+    private var sortedIDs: [UInt64] { visibleRows.map(\.id) }
 
     var body: some View {
         Group {
@@ -61,6 +91,8 @@ struct EditorPopover: View {
         .onAppear {
             refreshDesktopNumbers()
             syncBuffer()
+            searchText = ""
+            searchActive = false
             selectedID = defaultSelectedID
             hoveredID = nil
             pendingDeleteID = nil
@@ -75,6 +107,9 @@ struct EditorPopover: View {
             refreshDesktopNumbers()
             syncBuffer()
         }
+        .onChange(of: searchText) { _ in
+            keepSelectionInsideFilter()
+        }
     }
 
     private var mainContent: some View {
@@ -82,8 +117,9 @@ struct EditorPopover: View {
             sectionLabel(L10n.t("section.current"))
             currentCard
 
-            sectionLabel(L10n.t("section.all"))
-            spaceList
+            allSpacesHeader
+            searchBar
+            listArea
 
             if let jumpError {
                 Text(jumpError)
@@ -134,13 +170,14 @@ struct EditorPopover: View {
     }
 
     /// The row keyboard navigation should default to: the current Space when
-    /// it appears in the list, otherwise the first row (the current Space may
-    /// be a fullscreen app Space with no 桌面 number and no row of its own).
+    /// it appears in the (possibly filtered) list, otherwise the first row
+    /// (the current Space may be a fullscreen app Space with no 桌面 number
+    /// and no row of its own).
     private var defaultSelectedID: UInt64 {
-        if rows.contains(where: { $0.id == monitor.currentSpaceID }) {
+        if visibleRows.contains(where: { $0.id == monitor.currentSpaceID }) {
             return monitor.currentSpaceID
         }
-        return rows.first?.id ?? monitor.currentSpaceID
+        return visibleRows.first?.id ?? monitor.currentSpaceID
     }
 
     /// "v0.1.0 (1)" — marketing version and build number from the bundle.
@@ -278,11 +315,94 @@ struct EditorPopover: View {
             }
     }
 
+    /// "所有 Space" header; while filtering, the live match count sits on
+    /// the right so the narrowing is visible at a glance.
+    private var allSpacesHeader: some View {
+        HStack {
+            sectionLabel(L10n.t("section.all"))
+            Spacer()
+            if !trimmedQuery.isEmpty {
+                Text(L10n.t("badge.matches", visibleRows.count))
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+        }
+    }
+
+    /// The filter field. Deliberately looks nothing like the name field (a
+    /// beveled text box): a flat "search pill" — no bezel, filled rounded
+    /// rect, magnifying-glass icon, and a clear button that appears while
+    /// filtering. An idle pill shows its ⌘F shortcut.
+    private var searchBar: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.secondary)
+            SearchTextField(
+                text: $searchText,
+                placeholder: L10n.t("field.searchSpaces"),
+                focusRequestToken: searchFocusToken,
+                onEditingChanged: { editing in
+                    searchActive = editing
+                }
+            )
+            if !trimmedQuery.isEmpty {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .onTapGesture { searchText = "" }
+                    .help(L10n.t("hint.clearSearch"))
+            } else if !searchActive {
+                Text("⌘F")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .padding(.horizontal, 8)
+        .frame(height: 26)
+        .background(
+            RoundedRectangle(cornerRadius: 7)
+                .fill(Color.white.opacity(0.08))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 7)
+                .stroke(
+                    searchActive ? Color.accentColor.opacity(0.55) : Color.white.opacity(0.12),
+                    lineWidth: 1
+                )
+        )
+        .contentShape(RoundedRectangle(cornerRadius: 7))
+        // Clicking anywhere on the pill (icon, padding) focuses the field;
+        // clicks on the field itself already do, and end up here too.
+        .onTapGesture { startFind() }
+        .help(L10n.t("hint.searchField"))
+    }
+
+    /// The filtered list, or a quiet empty state when nothing matches.
+    @ViewBuilder
+    private var listArea: some View {
+        if visibleRows.isEmpty, !trimmedQuery.isEmpty {
+            VStack(spacing: 6) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 16, weight: .light))
+                    .foregroundStyle(.tertiary)
+                Text(L10n.t("empty.noMatch"))
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 22)
+        } else {
+            spaceList
+        }
+    }
+
     private var spaceList: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(spacing: 1) {
-                    ForEach(rows, id: \.id) { row in
+                    ForEach(visibleRows, id: \.id) { row in
                         spaceRow(id: row.id, desktop: row.desktop)
                             .id(row.id)
                     }
@@ -306,7 +426,7 @@ struct EditorPopover: View {
             Circle()
                 .fill(Color(hex: label.colorHex) ?? .gray)
                 .frame(width: 10, height: 10)
-            Text(label.name)
+            Text(highlightedName(label.name))
                 .font(.system(size: 13))
             Spacer()
             if isCurrent {
@@ -366,6 +486,21 @@ struct EditorPopover: View {
         .help(L10n.t(isCurrent ? "help.currentSpace" : "help.clickToSwitch"))
     }
 
+    /// Bolds + tints every case-insensitive occurrence of the search query
+    /// in a row name, so the filter's effect is obvious even in a long list.
+    private func highlightedName(_ name: String) -> AttributedString {
+        var attributed = AttributedString(name)
+        let query = trimmedQuery
+        guard !query.isEmpty else { return attributed }
+        var searchRange = attributed.startIndex..<attributed.endIndex
+        while let range = attributed[searchRange].range(of: query, options: [.caseInsensitive]) {
+            attributed[range].inlinePresentationIntent = .stronglyEmphasized
+            attributed[range].foregroundColor = Color.accentColor
+            searchRange = range.upperBound..<attributed.endIndex
+        }
+        return attributed
+    }
+
     private func rowBackground(isCurrent: Bool, isSelected: Bool, isHovered: Bool, isPendingDelete: Bool) -> Color {
         if isPendingDelete { return Color.red.opacity(0.1) }
         if isCurrent { return Color.accentColor.opacity(0.16) }
@@ -375,21 +510,50 @@ struct EditorPopover: View {
     }
 
     /// ↑/↓ moves the selection through the Space list; ⏎ jumps to the
-    /// selected Space. Key events are left alone while the name field is
-    /// being edited, and any ⌃ combination is passed through (the ^⇧↑
-    /// toggle hotkey must reach the app-level monitor).
+    /// selected Space. While the search field owns the keyboard, ↑/↓/⏎
+    /// keep steering the (filtered) list — launcher-style — and Esc first
+    /// clears the filter, then exits the field. ⌘F focuses the search
+    /// field from the list. Keys are left alone while an input method is
+    /// composing (marked text), and other ⌃ combinations are passed
+    /// through (the ^⇧↑ toggle hotkey must reach the app-level monitor).
     private func installKeyMonitor() {
         guard keyMonitor == nil else { return }
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [self] event in
-            // Let the name TextField handle keys while it owns first responder.
+            // A text field (name or search) owns the keyboard right now.
             if let firstResponder = NSApp.keyWindow?.firstResponder, firstResponder is NSTextView {
-                // Except Esc, which ends the rename session and returns
-                // ↑/↓/⏎ to the list.
-                if event.keyCode == 53 {
+                switch event.keyCode {
+                case 126, 125, 36, 76:  // ↑ / ↓ / ⏎
+                    if searchActive, !hasMarkedText() {
+                        // Steer the list instead of typing into the field.
+                        if event.keyCode == 126, event.modifierFlags.contains(.control) {
+                            return event
+                        }
+                        self.handleListKey(event.keyCode)
+                        return nil
+                    }
+                    return event
+                case 53:  // Esc
+                    if searchActive {
+                        if hasMarkedText() {
+                            // First Esc cancels the in-progress IME composition.
+                            return event
+                        }
+                        if !searchText.isEmpty {
+                            searchText = ""
+                        } else {
+                            self.endSearchEditing()
+                        }
+                        return nil
+                    }
                     self.endRenaming()
                     return nil
+                case 15:  // R — ⌘R works even while the search field is focused
+                    if !event.modifierFlags.contains(.command) { return event }
+                    self.startRenaming()
+                    return nil
+                default:
+                    return event
                 }
-                return event
             }
             switch event.keyCode {
             case 126:  // ↑
@@ -404,6 +568,10 @@ struct EditorPopover: View {
                 return nil
             case 51, 117:  // ⌫ / ⌦ — arms the hovered row, then deletes it
                 self.handleDelete()
+                return nil
+            case 3:  // F — ⌘F focuses the search/filter field
+                if !event.modifierFlags.contains(.command) { return event }
+                self.startFind()
                 return nil
             case 15:  // R
                 if !event.modifierFlags.contains(.command) { return event }
@@ -423,10 +591,11 @@ struct EditorPopover: View {
     }
 
     /// AppKit auto-focuses the name TextField whenever the popover window
-/// becomes key (initial first responder). @FocusState can't override that
-/// once it has happened, so listen for the window becoming key and grab
-/// the focus back — the Space list owns it by default, and ↑/↓ + ⏎ work
-/// immediately. The user can still focus the field (click or ⌘R).
+    /// becomes key (initial first responder). @FocusState can't override
+    /// that once it has happened, so listen for the window becoming key
+    /// and steal the focus back — the Space list owns the keyboard by
+    /// default, and ↑/↓ + ⏎ work immediately. ⌘F (or clicking the search
+    /// bar) moves focus into the search field.
     private func installKeyObserver() {
         guard keyObserver == nil else { return }
         keyObserver = NotificationCenter.default.addObserver(
@@ -434,7 +603,7 @@ struct EditorPopover: View {
             object: nil,
             queue: .main
         ) { [self] _ in
-            stealFocusFromNameField()
+            assignInitialFocus()
         }
     }
 
@@ -445,9 +614,9 @@ struct EditorPopover: View {
         }
     }
 
-    private func stealFocusFromNameField() {
-        // One runloop hop: the initial-first-responder assignment happens
-        // right after the notification, so wait for it before stealing back.
+    private func assignInitialFocus() {
+        // One runloop hop: the initial-first-responder assignment (the name
+        // field) happens right after the notification, so wait for it.
         DispatchQueue.main.async {
             guard let window = NSApp.keyWindow,
                 window.firstResponder is NSTextView
@@ -498,8 +667,57 @@ struct EditorPopover: View {
         selectedID = sortedIDs[newIndex]
     }
 
+    /// Routes list-navigation keys (↑/↓/⏎) while the search field is
+    /// focused — the same handlers the list uses when it owns the keyboard.
+    private func handleListKey(_ keyCode: UInt16) {
+        switch keyCode {
+        case 126:
+            moveSelection(-1)
+        case 125:
+            moveSelection(1)
+        case 36, 76:
+            jumpToSelected()
+        default:
+            break
+        }
+    }
+
+    /// Whether the active text field has uncommitted IME text (e.g. pinyin
+    /// composition). While it does, navigation keys must reach the input
+    /// method instead of being stolen for list movement.
+    private func hasMarkedText() -> Bool {
+        guard let editor = NSApp.keyWindow?.firstResponder as? NSTextView else { return false }
+        return editor.hasMarkedText()
+    }
+
+    /// Esc with an empty search: leave the search field so the list owns
+    /// the keyboard again (↑/↓/⏎ work without the filter).
+    private func endSearchEditing() {
+        NSApp.keyWindow?.makeFirstResponder(nil)
+    }
+
+    /// After every keystroke in the search bar, keep the ↑/↓ cursor inside
+    /// the filtered set: the current Space when it matches (as on open),
+    /// otherwise the first match — or nothing when no row matches.
+    private func keepSelectionInsideFilter() {
+        let ids = visibleRows.map(\.id)
+        if ids.isEmpty {
+            selectedID = nil
+        } else if let sel = selectedID, ids.contains(sel) {
+            return
+        } else if ids.contains(monitor.currentSpaceID) {
+            selectedID = monitor.currentSpaceID
+        } else {
+            selectedID = ids.first
+        }
+    }
+
     private func jumpToSelected() {
-        guard let id = selectedID else { return }
+        // Only jump when the selection is actually visible — after typing a
+        // query the previously selected Space may no longer match.
+        guard let id = selectedID,
+            visibleRows.contains(where: { $0.id == id })
+        else { return }
         jump(to: id)
     }
 
@@ -507,6 +725,13 @@ struct EditorPopover: View {
     /// and selecting its current contents so typing replaces them right away.
     private func startRenaming() {
         renameRequestToken += 1
+    }
+
+    /// ⌘F: bump the request token; the search field responds by grabbing
+    /// focus and selecting its current contents, so typing filters right
+    /// away.
+    private func startFind() {
+        searchFocusToken += 1
     }
 
     /// Esc while renaming: give keyboard control (↑/↓/⏎) back to the list.
@@ -610,6 +835,80 @@ private struct RenameTextField: NSViewRepresentable {
             guard let field = sender as? NSTextField else { return }
             parent.text = field.stringValue
             field.window?.makeFirstResponder(nil)
+        }
+    }
+}
+
+/// Borderless single-line field for the filter bar. No bezel or drawn
+/// background — the flat "search pill" around it is SwiftUI. Like
+/// `RenameTextField`, the delegate reports every change (IME composition
+/// included) so the list filters live while pinyin is still being marked.
+private struct SearchTextField: NSViewRepresentable {
+    @Binding var text: String
+    var placeholder: String
+    /// Increment to request focus (+ select-all), e.g. on popover open.
+    var focusRequestToken: Int
+    /// Fired when the editing session starts / ends (focus change, Esc).
+    var onEditingChanged: (Bool) -> Void = { _ in }
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    func makeNSView(context: Context) -> NSTextField {
+        let field = NSTextField(string: text)
+        field.placeholderString = placeholder
+        field.isBordered = false
+        field.drawsBackground = false
+        field.focusRingType = .none
+        field.font = .systemFont(ofSize: 12)
+        field.lineBreakMode = .byTruncatingTail
+        field.delegate = context.coordinator
+        return field
+    }
+
+    func updateNSView(_ field: NSTextField, context: Context) {
+        // Compare against the live field-editor string, which includes any
+        // uncommitted IME text; never overwrite mid-composition — that would
+        // interrupt the input method.
+        let current = field.currentEditor()?.string ?? field.stringValue
+        if current != text {
+            // A binding change while the field is being edited (Esc / ✕
+            // clears the filter) must rewrite the field editor itself —
+            // setting stringValue alone doesn't rerender a live editor.
+            if let editor = field.currentEditor() {
+                editor.string = text
+            } else {
+                field.stringValue = text
+            }
+        }
+        let coordinator = context.coordinator
+        if coordinator.focusToken != focusRequestToken {
+            coordinator.focusToken = focusRequestToken
+            DispatchQueue.main.async {
+                field.selectText(nil)
+            }
+        }
+    }
+
+    final class Coordinator: NSObject, NSTextFieldDelegate {
+        var parent: SearchTextField
+        var focusToken = 0
+
+        init(_ parent: SearchTextField) {
+            self.parent = parent
+        }
+
+        func controlTextDidChange(_ obj: Notification) {
+            guard let field = obj.object as? NSTextField else { return }
+            let editorText = field.currentEditor()?.string ?? field.stringValue
+            parent.text = editorText
+        }
+
+        func controlTextDidBeginEditing(_ obj: Notification) {
+            parent.onEditingChanged(true)
+        }
+
+        func controlTextDidEndEditing(_ obj: Notification) {
+            parent.onEditingChanged(false)
         }
     }
 }

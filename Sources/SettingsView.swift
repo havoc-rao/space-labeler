@@ -35,7 +35,7 @@ struct SettingsView: View {
             Spacer(minLength: 0)
         }
         .padding(13)
-        .frame(width: 290, height: 430)
+        .frame(width: 290, height: 450)
         .onAppear { refreshStatus() }
         .onChange(of: languageRaw) { _ in refreshStatus() }
     }

@@ -196,6 +196,9 @@ struct EditorPopover: View {
 
     private var currentCard: some View {
         VStack(alignment: .leading, spacing: 10) {
+            // Same flat "pill" as the search bar below: no bezel — the
+            // rounded fill and stroke around the field are SwiftUI. The
+            // trailing ⌘R hint / clear button mirror the search pill too.
             HStack(spacing: 6) {
                 RenameTextField(
                     text: $nameBuffer,
@@ -213,12 +216,38 @@ struct EditorPopover: View {
                     store.update(bufferedID, l)
                 }
 
-                // ⏎ hint: the edit commits and focus returns to the list.
-                Image(systemName: "return")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(store.isRenaming ? Color.accentColor : Color.secondary)
-                    .help(L10n.t("hint.enterToSubmit"))
+                if store.isRenaming, !nameBuffer.isEmpty {
+                    // Clear the field so a fresh name starts blank — the
+                    // search pill's ✕, applied to the name.
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .onTapGesture { nameBuffer = "" }
+                        .help(L10n.t("hint.clearName"))
+                } else if !store.isRenaming {
+                    // Idle: the ⌘R shortcut, like the search pill shows ⌘F.
+                    Text("⌘R")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.tertiary)
+                }
             }
+            .padding(.horizontal, 8)
+            .frame(height: 26)
+            .background(
+                RoundedRectangle(cornerRadius: 7)
+                    .fill(Color.white.opacity(0.08))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 7)
+                    .stroke(
+                        store.isRenaming ? Color.accentColor.opacity(0.55) : Color.white.opacity(0.12),
+                        lineWidth: 1
+                    )
+            )
+            // Clicking anywhere on the pill (hint text, padding) starts a
+            // rename; the field itself is reached natively.
+            .contentShape(RoundedRectangle(cornerRadius: 7))
+            .onTapGesture { startRenaming() }
 
             colorPicker
         }
@@ -330,10 +359,11 @@ struct EditorPopover: View {
         }
     }
 
-    /// The filter field. Deliberately looks nothing like the name field (a
-    /// beveled text box): a flat "search pill" — no bezel, filled rounded
+    /// The filter field. A flat "search pill" — no bezel, filled rounded
     /// rect, magnifying-glass icon, and a clear button that appears while
-    /// filtering. An idle pill shows its ⌘F shortcut.
+    /// filtering. An idle pill shows its ⌘F shortcut. The name field above
+    /// uses the same pill, with the same trailing shortcut hint and clear
+    /// button.
     private var searchBar: some View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
@@ -765,7 +795,8 @@ struct EditorPopover: View {
 /// NSTextField wrapper. Unlike SwiftUI's TextField — whose text binding does
 /// not update while an input method is composing (marked text, e.g. pinyin) —
 /// the delegate hears about every editing change, so renaming updates the
-/// store live instead of only after ⏎ confirms the composition.
+/// store live instead of only after ⏎ confirms the composition. Borderless,
+/// like `SearchTextField`: the flat pill around it is SwiftUI.
 private struct RenameTextField: NSViewRepresentable {
     @Binding var text: String
     var placeholder: String
@@ -779,9 +810,13 @@ private struct RenameTextField: NSViewRepresentable {
     func makeNSView(context: Context) -> NSTextField {
         let field = NSTextField(string: text)
         field.placeholderString = placeholder
-        field.bezelStyle = .roundedBezel
-        field.font = .systemFont(ofSize: 13)
-        field.focusRingType = .default
+        // Borderless — the flat "pill" around the field is SwiftUI, same
+        // as the search bar.
+        field.isBordered = false
+        field.drawsBackground = false
+        field.focusRingType = .none
+        field.font = .systemFont(ofSize: 12)
+        field.lineBreakMode = .byTruncatingTail
         field.delegate = context.coordinator
         field.target = context.coordinator
         field.action = #selector(Coordinator.commit(_:))

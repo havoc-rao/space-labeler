@@ -1,11 +1,13 @@
 import Foundation
 
-/// Shared label color palette: 7 light hues with their darker counterparts.
+/// Shared label color palette: 6 light hues with their darker counterparts.
 /// The two rows of the picker align column-by-column — light red sits on
 /// top of dark red, etc. — so the same hue in two intensities can be used
 /// to mark different window states. Both the popover's color picker and
-/// `SpaceStore.autoAssign` use this single source. 14 colors + the expand
-/// chevron occupy the 8-column grid's final cell, leaving one cell empty.
+/// `SpaceStore.autoAssign` use this single source. The picker layout is
+/// fixed: the first row is always the 6 light swatches + the expand
+/// chevron (7 cells); expanding adds the 7 dark swatches as a second row,
+/// with the 7th dark column sharing the chevron's column.
 enum SpacePalette {
     /// Light row — the default collapsed view. 6 entries so the 7th
     /// grid cell is free for the expand chevron.
@@ -18,8 +20,9 @@ enum SpacePalette {
         "#2DD4BF",  // 青
     ]
 
-    /// Dark row — same hues, deeper tone; columns 1–6 align with the
-    /// light row above (the 7th dark column has no light counterpart).
+    /// Dark row — the expanded view's second row; same hues, deeper tone.
+    /// Columns 1–6 align with the light row above (the 7th dark column has
+    /// no light counterpart, sharing the chevron's column instead).
     static let darkColors = [
         "#B91C1C",  // 深红
         "#15803D",  // 深绿

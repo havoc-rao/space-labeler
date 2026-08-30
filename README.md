@@ -68,7 +68,7 @@ The list shows the desktop's order (1, 2, 3…) as Mission Control sees it, so t
 
 ### Filtering Spaces
 
-When the popover opens, focus stays on the "All Spaces" list (`↑`/`↓`/`⏎` work immediately). Press `⌘F` (or click the search bar above the list) to move focus into the filter field: type and the list filters live — matching the label name or the desktop number (e.g. `3`), with matched fragments bolded and the match count shown on the right. While filtering, `↑`/`↓` keep moving through the narrowed list and `⏎` jumps to the selected Space; `Esc` clears the filter first, then leaves the search bar back to the list. The search bar is a flat rounded "pill" (magnifier icon, clear ✕) — deliberately distinct from the beveled "Space name" field in the Current Space card.
+When the popover opens, focus stays on the "All Spaces" list (`↑`/`↓` move the selection, `⏎` jumps to the selected Space). While the list is focused, `1`–`9` move the selection straight to that desktop's row (matching the "Desktop N" badge); press `⏎` to actually jump. Press `⌘F` (or click the search bar above the list) to move focus into the filter field: type and the list filters live — matching the label name or the desktop number (e.g. `3`), with matched fragments bolded and the match count shown on the right. While filtering, `↑`/`↓` keep moving through the narrowed list and `⏎` jumps to the selected Space; `Esc` clears the filter first, then leaves the search bar back to the list. The search bar is a flat rounded "pill" (magnifier icon, clear ✕) — deliberately distinct from the beveled "Space name" field in the Current Space card.
 
 ### Direct jumps (Ctrl+N)
 

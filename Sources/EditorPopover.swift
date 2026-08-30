@@ -599,6 +599,11 @@ struct EditorPopover: View {
                 self.startRenaming()
                 return nil
             default:
+                // 1–9 move the selection to that desktop's row; ⏎ still
+                // performs the actual jump. ⌘/⌃/⌥-modified keys fall through.
+                if self.handleDigitKey(event) {
+                    return nil
+                }
                 return event
             }
         }
@@ -686,6 +691,35 @@ struct EditorPopover: View {
         }
         let newIndex = (index + delta + sortedIDs.count) % sortedIDs.count
         selectedID = sortedIDs[newIndex]
+    }
+
+    /// 1–9 while the Space list owns the keyboard: move the ↑/↓ selection to
+    /// the row whose "Desktop N" badge matches the digit — no jump yet, ⏎
+    /// performs it afterwards, exactly like ↑/↓ selection. Rows hidden by
+    /// the filter stay unreachable. When the private numbering API is
+    /// unavailable (no badges at all) the digit picks the Nth visible row by
+    /// position instead. ⌘/⌃/⌥-modified keys and non-digit keys pass through.
+    private func handleDigitKey(_ event: NSEvent) -> Bool {
+        let modifiers = event.modifierFlags.intersection([.command, .control, .option])
+        guard modifiers.isEmpty,
+            let chars = event.characters,
+            let digit = chars.first?.wholeNumberValue,
+            (1...9).contains(digit)
+        else { return false }
+        selectByDigit(digit)
+        return true
+    }
+
+    private func selectByDigit(_ digit: Int) {
+        if let desktopNumbers {
+            guard let row = visibleRows.first(where: { $0.desktop == digit }) else { return }
+            selectedID = row.id
+        } else {
+            // Numbering API unavailable: every row is badge-less, so the
+            // digit numbers the visible list 1-based instead.
+            guard visibleRows.indices.contains(digit - 1) else { return }
+            selectedID = visibleRows[digit - 1].id
+        }
     }
 
     /// Routes list-navigation keys (↑/↓/⏎) while the search field is

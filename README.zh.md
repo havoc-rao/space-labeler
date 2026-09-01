@@ -74,7 +74,7 @@ rm ~/Library/LaunchAgents/com.jeremywatt.SpaceLabeler.plist
 
 跳转通过发送一次系统「切换到桌面 N」快捷键（`Ctrl+N`）实现。SpaceLabeler 会**自动读取系统实际启用的数字快捷键范围**：如果目标桌面的快捷键未勾选，会给出精确提示（「桌面 N 的快捷键未启用——请在调度中心勾选」），而不是发一个无效按键。
 
-设置界面（**Preferences…**）内置 **环境自检**：实时显示辅助功能授权状态、系统已启用的数字快捷键（如 `1, 2, 3, 4`），并有「请求权限…」按钮直接触发系统授权弹窗。
+设置界面（**Preferences…**）内置 **环境自检**：实时显示辅助功能授权状态、系统已启用的数字快捷键（如 `1, 2, 3, 4`），并有「请求权限…」按钮直接触发系统授权弹窗。如果「系统设置 → 隐私与安全性 → 辅助功能」里的开关怎么都开不上——这是 zip 安装残留的旧权限记录（旧签名条目）遮挡新授权的典型症状——点击「清理旧的辅助功能权限记录」即可清除 macOS 存储的该应用权限条目（等价于 Makefile `install` 目标里的 `sudo tccutil reset Accessibility`，管理员密码由系统弹窗处理），随后会自动再次弹出授权窗口，重新授权一次即可。
 
 设置界面还能切换界面语言（**Language**，默认中文，可选 English）——切换后立即生效并持久保存。
 
@@ -86,7 +86,7 @@ rm ~/Library/LaunchAgents/com.jeremywatt.SpaceLabeler.plist
 
 更新检查优先读取 release workflow 提交到仓库 `main` 分支的小型 `latest.json`（版本号 + 直链下载地址 + SHA-256），不经 GitHub API、不限流，并在安装前用 SHA-256 校验下载的 zip；若 `latest.json` 不存在则回退到 GitHub releases API。
 
-注意：每次构建都是新的 ad-hoc 签名，macOS 可能因此重置辅助功能授权——若更新后跳转（Ctrl+N）失效，请到「系统设置 → 隐私与安全性 → 辅助功能」重新开启 Space Labeler。更新源仓库在 `Sources/Updater.swift` 的 `UpdaterConfig.repo` 中配置，仓库迁移时只需改这一处。
+注意：每次构建都是新的 ad-hoc 签名，macOS 可能因此重置辅助功能授权——若更新后跳转（Ctrl+N）失效，请到「系统设置 → 隐私与安全性 → 辅助功能」重新开启 Space Labeler；若开关卡住无法开启，请用「偏好设置 → 环境自检 → 清理旧的辅助功能权限记录」。更新源仓库在 `Sources/Updater.swift` 的 `UpdaterConfig.repo` 中配置，仓库迁移时只需改这一处。
 
 ## 开发
 

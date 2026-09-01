@@ -88,6 +88,23 @@ enum L10n {
         "settings.selfCheckHint":
             "Jumping posts Ctrl+N — the Accessibility permission and the target desktop's “Switch to Desktop N” shortcut must both be enabled, and the target Space must be on the current display.",
 
+        // Accessibility record reset (SettingsView) — mirrors the Makefile's
+        // `sudo tccutil reset Accessibility` in the `install` target.
+        "settings.resetAccessibility": "Clean stale Accessibility records",
+        "settings.resetAccessibilityButton": "Reset…",
+        "settings.resetAccessibilityHint":
+            "Wipes macOS's stored Accessibility records for Space Labeler (needs your admin password); you'll then re-grant the permission once.",
+        "settings.resetAccessibilityExplain":
+            "Ad-hoc installs change the app's signature every time — dead records can shadow a fresh grant. Same as `sudo tccutil reset Accessibility` in the Makefile.",
+        "settings.resetPromptTitle": "Reset Accessibility records?",
+        "settings.resetPromptMessage":
+            "This clears macOS's stored Accessibility permission for Space Labeler, including stale entries from older builds. You'll be asked for your admin password, and the system will then ask you to re-grant the permission.",
+        "settings.resetPromptConfirm": "Reset & Re-grant",
+        "settings.resetPromptCancel": "Cancel",
+        "settings.resetFailedTitle": "Reset failed",
+        "settings.resetFailedMessage": "Couldn't clear the Accessibility records: %@",
+        "settings.ok": "OK",
+
         // SettingsView
         "settings.back": "Back",
         "settings.title": "SETTINGS",
@@ -152,6 +169,23 @@ enum L10n {
         "settings.digitsLabel": "数字桌面快捷键",
         "settings.digitsValueNone": "未启用任何数字快捷键——请勾选「切换到桌面 1…9」",
         "settings.selfCheckHint": "跳转通过发送 Ctrl+N 实现：需要辅助功能权限已授权、目标桌面的「切换到桌面 N」快捷键已勾选、目标 Space 在当前屏幕。",
+
+        // 清理辅助功能权限记录（SettingsView）——与 Makefile `install` 目标中的
+        // `sudo tccutil reset Accessibility` 等价。
+        "settings.resetAccessibility": "清理旧的辅助功能权限记录",
+        "settings.resetAccessibilityButton": "重置…",
+        "settings.resetAccessibilityHint":
+            "清除 macOS 中存储的 Space Labeler 辅助功能权限记录（需要输入管理员密码），之后需重新授权一次。",
+        "settings.resetAccessibilityExplain":
+            "每次安装都会改变 ad-hoc 签名，旧记录可能遮挡新授权。等价于 Makefile 中的 `sudo tccutil reset Accessibility`。",
+        "settings.resetPromptTitle": "重置辅助功能权限记录？",
+        "settings.resetPromptMessage":
+            "这会清除 macOS 中存储的 Space Labeler 辅助功能权限（包括旧版本遗留的失效记录）。系统会要求输入管理员密码，随后会弹出授权窗口，请重新授权。",
+        "settings.resetPromptConfirm": "重置并重新授权",
+        "settings.resetPromptCancel": "取消",
+        "settings.resetFailedTitle": "重置失败",
+        "settings.resetFailedMessage": "无法清除辅助功能权限记录：%@",
+        "settings.ok": "好",
 
         // SettingsView
         "settings.back": "返回",

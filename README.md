@@ -74,7 +74,7 @@ When the popover opens, focus stays on the "All Spaces" list (`↑`/`↓` move t
 
 Jumping posts a single "Switch to Desktop N" shortcut (`Ctrl+N`). SpaceLabeler automatically reads which desktop shortcuts are actually enabled on this machine: if the target desktop's shortcut isn't checked, you get a precise message ("Desktop N's shortcut is not enabled — check it in Mission Control") instead of a dead keystroke.
 
-Open **Preferences…** — a **STATUS** self-check shows the live Accessibility grant state, the system's enabled Ctrl+N shortcuts (e.g. `1, 2, 3, 4`), and a "Request permission…" button that pops the system authorization dialog.
+Open **Preferences…** — a **STATUS** self-check shows the live Accessibility grant state, the system's enabled Ctrl+N shortcuts (e.g. `1, 2, 3, 4`), and a "Request permission…" button that pops the system authorization dialog. If the toggle in System Settings won't stick — a classic symptom of stale permission records left behind by an older zip install — the **"Clean stale Accessibility records"** button wipes macOS's stored entries for this app (the same `sudo tccutil reset Accessibility` the Makefile's `install` target runs, with the admin password prompt handled by the system), then re-triggers the authorization dialog so you can re-grant once.
 
 Preferences also includes a **Language** picker (中文 by default, English available) — the UI switches immediately and persists.
 
@@ -86,7 +86,7 @@ On launch the app silently checks for a new release (at most once per day). Open
 
 The check reads a small `latest.json` (version + direct zip URL + SHA-256) committed to the repo's `main` branch by the release workflow — no GitHub API rate limit — and verifies the downloaded zip against that SHA-256 before installing. If `latest.json` is absent it falls back to the GitHub releases API.
 
-Note: every build carries a fresh ad-hoc signature, so macOS may reset the Accessibility grant — if jumping (Ctrl+N) stops working after an update, re-enable Space Labeler in System Settings → Privacy & Security → Accessibility. The update source repo is configured in one constant, `UpdaterConfig.repo` in `Sources/Updater.swift`, so it's easy to change if the repository moves.
+Note: every build carries a fresh ad-hoc signature, so macOS may reset the Accessibility grant — if jumping (Ctrl+N) stops working after an update, re-enable Space Labeler in System Settings → Privacy & Security → Accessibility. If the toggle is stuck, use Preferences → STATUS → **Clean stale Accessibility records** instead. The update source repo is configured in one constant, `UpdaterConfig.repo` in `Sources/Updater.swift`, so it's easy to change if the repository moves.
 
 ## Development
 

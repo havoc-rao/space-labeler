@@ -17,6 +17,9 @@ struct SettingsView: View {
     // Environment self-check state.
     @State private var axTrusted = SkyLight.isAccessibilityTrusted
     @State private var digits: Set<Int> = []
+    /// True while the elevated `tccutil reset` (with its admin password
+    /// prompt) is running.
+    @State private var isResetting = false
 
     private var language: AppLanguage {
         AppLanguage(rawValue: languageRaw) ?? .zh
@@ -209,6 +212,48 @@ struct SettingsView: View {
         }
     }
 
+    /// Confirmation before wiping macOS's stored Accessibility records for
+    /// this app (the Makefile's `sudo tccutil reset`). The admin password
+    /// prompt comes from the system after this dialog is accepted.
+    private func confirmAndResetAccessibility() {
+        let alert = NSAlert()
+        alert.messageText = L10n.t("settings.resetPromptTitle")
+        alert.informativeText = L10n.t("settings.resetPromptMessage")
+        alert.addButton(withTitle: L10n.t("settings.resetPromptConfirm"))
+        alert.addButton(withTitle: L10n.t("settings.resetPromptCancel"))
+        alert.alertStyle = .warning
+        if alert.runModal() == .alertFirstButtonReturn {
+            performAccessibilityReset()
+        }
+    }
+
+    /// Runs the elevated `tccutil reset Accessibility`, then re-triggers the
+    /// system authorization dialog so the user can re-grant immediately.
+    private func performAccessibilityReset() {
+        isResetting = true
+        let result = SkyLight.resetAccessibilityRecords()
+        isResetting = false
+        refreshStatus()
+
+        switch result {
+        case .success:
+            // The table is clean now — pop the system dialog right away so
+            // the fresh grant lands in it instead of next to dead entries.
+            if !axTrusted {
+                SkyLight.promptForAccessibility()
+            }
+        case .cancelled:
+            break
+        case .failed(let message):
+            let alert = NSAlert()
+            alert.messageText = L10n.t("settings.resetFailedTitle")
+            alert.informativeText = L10n.t("settings.resetFailedMessage", message)
+            alert.addButton(withTitle: L10n.t("settings.ok"))
+            alert.alertStyle = .critical
+            alert.runModal()
+        }
+    }
+
     private var statusSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
@@ -249,6 +294,40 @@ struct SettingsView: View {
                     .help(L10n.t("settings.requestPermissionHint"))
                     Spacer()
                 }
+            }
+
+            // Clears macOS's stored Accessibility records for this app — the
+            // in-app equivalent of `sudo tccutil reset Accessibility` in the
+            // Makefile. Ad-hoc installs (zip updates in particular) change
+            // the code signature on every build, so dead TCC entries can
+            // accumulate under the same bundle id and shadow a fresh grant,
+            // leaving the STATUS check stuck on "not granted". The reset
+            // wipes them so the user can re-grant cleanly.
+            HStack(spacing: 8) {
+                Text(L10n.t("settings.resetAccessibility"))
+                    .font(.system(size: 12))
+                Spacer()
+                Button {
+                    confirmAndResetAccessibility()
+                } label: {
+                    if isResetting {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Text(L10n.t("settings.resetAccessibilityButton"))
+                    }
+                }
+                .buttonStyle(.bordered)
+                .font(.system(size: 11))
+                .disabled(isResetting)
+                .help(L10n.t("settings.resetAccessibilityHint"))
+            }
+
+            if !axTrusted {
+                Text(L10n.t("settings.resetAccessibilityExplain"))
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             Text(L10n.t("settings.shortcutTitle"))

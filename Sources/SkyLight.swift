@@ -79,6 +79,54 @@ enum SkyLight {
         _ = AXIsProcessTrustedWithOptions(options)
     }
 
+    // MARK: - Accessibility record reset
+
+    /// Outcome of `resetAccessibilityRecords()`.
+    enum AccessibilityResetResult: Equatable {
+        case success
+        case cancelled
+        case failed(String)
+    }
+
+    /// Wipes macOS's stored Accessibility (TCC) records for this app — the
+    /// GUI equivalent of the Makefile's
+    /// `sudo tccutil reset Accessibility com.jeremywatt.SpaceLabeler`
+    /// (the `install` target runs it after every build).
+    ///
+    /// Every release is ad-hoc signed, so the code signature changes on each
+    /// install/update. macOS keeps the old dead TCC entries under the same
+    /// bundle id, and they can shadow a fresh grant: the STATUS check stays
+    /// stuck on "not granted" even after the user enables the app. Resetting
+    /// clears the whole table for this bundle id so the next grant lands
+    /// cleanly — this is what fixes a zip install that "can't be used".
+    ///
+    /// Elevation goes through an in-process AppleScript `do shell script …
+    /// with administrator privileges`, which reuses the system's own
+    /// authorization dialog for the admin password — the app never handles
+    /// the password itself. Blocks on the main thread until the dialog is
+    /// dismissed (the security agent runs out-of-process, so the dialog UI
+    /// stays responsive).
+    @MainActor
+    static func resetAccessibilityRecords() -> AccessibilityResetResult {
+        let bundleID = Bundle.main.bundleIdentifier ?? "com.jeremywatt.SpaceLabeler"
+        let source =
+            "do shell script \"/usr/bin/tccutil reset Accessibility \(bundleID)\" with administrator privileges"
+        var error: NSDictionary?
+        let script = NSAppleScript(source: source)
+        _ = script?.executeAndReturnError(&error)
+        guard let error else { return .success }
+        // AppleScript reports the user cancelling the authorization dialog
+        // as error -128 ("User canceled") — that is not a failure.
+        if (error[NSAppleScript.errorNumber] as? Int) == -128 {
+            return .cancelled
+        }
+        let message =
+            (error[NSAppleScript.errorMessage] as? String)
+            ?? (error[NSAppleScript.errorBriefMessage] as? String)
+            ?? "Unknown AppleScript error"
+        return .failed(message)
+    }
+
     // MARK: - Shortcut enablement detection
 
     /// A "Switch to Desktop N" shortcut as configured in System Settings.

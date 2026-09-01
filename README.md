@@ -84,6 +84,8 @@ Labels and colors persist across reboots in `UserDefaults` under the key `SpaceL
 
 On launch the app silently checks for a new release (at most once per day). Open **Preferences…** → **UPDATES** to run a manual "Check for Updates…" at any time; when a new version is found, hit **Download & Restart** and the app quits, replaces itself in place, and relaunches.
 
+The check reads a small `latest.json` (version + direct zip URL + SHA-256) committed to the repo's `main` branch by the release workflow — no GitHub API rate limit — and verifies the downloaded zip against that SHA-256 before installing. If `latest.json` is absent it falls back to the GitHub releases API.
+
 Note: every build carries a fresh ad-hoc signature, so macOS may reset the Accessibility grant — if jumping (Ctrl+N) stops working after an update, re-enable Space Labeler in System Settings → Privacy & Security → Accessibility. The update source repo is configured in one constant, `UpdaterConfig.repo` in `Sources/Updater.swift`, so it's easy to change if the repository moves.
 
 ## Development
@@ -116,7 +118,7 @@ git tag v0.2.0
 git push origin v0.2.0
 ```
 
-`.github/workflows/release.yml` builds a universal (arm64 + x86_64) Release on macOS, packages it as a zip, and publishes it to a GitHub Release (the tag must match the VERSION file or the workflow errors out; the same workflow can also be run manually from the Actions tab, publishing `v$(VERSION)`). The in-app update check pulls from these Releases.
+`.github/workflows/release.yml` builds a universal (arm64 + x86_64) Release on macOS, packages it as a zip, and publishes it to a GitHub Release (the tag must match the VERSION file or the workflow errors out; the same workflow can also be run manually from the Actions tab, publishing `v$(VERSION)`). It also commits the `latest.json` update metadata to `main`, which the in-app update check reads.
 
 ## Notes on the private API
 

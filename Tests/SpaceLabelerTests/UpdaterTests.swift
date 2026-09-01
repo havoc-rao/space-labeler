@@ -32,4 +32,20 @@ final class UpdaterTests: XCTestCase {
         XCTAssertFalse(AppVersion(raw: "0.1.0")! > current, "the same version is not an update")
         XCTAssertFalse(AppVersion(raw: "0.0.9")! > current, "a lower version is not an update")
     }
+
+    /// The SHA-256 hex format the updater uses to verify downloaded zips —
+    /// lower-case hex, matching what the release workflow writes to latest.json.
+    func test_sha256Digest_isLowercaseHex() throws {
+        let fm = FileManager.default
+        let url = fm.temporaryDirectory.appendingPathComponent("sha256-\(UUID().uuidString).bin")
+        try Data("hello".utf8).write(to: url)
+        defer { try? fm.removeItem(at: url) }
+
+        let digest = try UpdaterState.sha256(of: url)
+        XCTAssertEqual(
+            digest,
+            "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+        )
+        XCTAssertEqual(digest, digest.lowercased(), "digest must be lower-case hex")
+    }
 }

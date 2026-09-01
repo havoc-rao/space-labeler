@@ -84,6 +84,8 @@ rm ~/Library/LaunchAgents/com.jeremywatt.SpaceLabeler.plist
 
 应用启动时会静默检查一次更新（每天最多一次）。打开 **Preferences…** → **更新** 区块，可随时手动「检查更新…」；发现新版本后点击「下载并重启」，应用会退出、用新版本替换自身并自动重新启动。
 
+更新检查优先读取 release workflow 提交到仓库 `main` 分支的小型 `latest.json`（版本号 + 直链下载地址 + SHA-256），不经 GitHub API、不限流，并在安装前用 SHA-256 校验下载的 zip；若 `latest.json` 不存在则回退到 GitHub releases API。
+
 注意：每次构建都是新的 ad-hoc 签名，macOS 可能因此重置辅助功能授权——若更新后跳转（Ctrl+N）失效，请到「系统设置 → 隐私与安全性 → 辅助功能」重新开启 Space Labeler。更新源仓库在 `Sources/Updater.swift` 的 `UpdaterConfig.repo` 中配置，仓库迁移时只需改这一处。
 
 ## 开发
@@ -116,7 +118,7 @@ git tag v0.2.0
 git push origin v0.2.0
 ```
 
-`.github/workflows/release.yml` 会在 macOS 上构建通用（arm64 + x86_64）Release 包、打包成 zip 并发布到 GitHub Release（tag 必须与 VERSION 文件一致，否则 workflow 会报错；也可以在 Actions 页面手动触发同一个 workflow，它会按 VERSION 发布）。应用内置的更新检查即拉取这些 Release。
+`.github/workflows/release.yml` 会在 macOS 上构建通用（arm64 + x86_64）Release 包、打包成 zip 并发布到 GitHub Release（tag 必须与 VERSION 文件一致，否则 workflow 会报错；也可以在 Actions 页面手动触发同一个 workflow，它会按 VERSION 发布）。同时它会把更新元数据 `latest.json` 提交到 `main`，供应用内更新检查读取。
 
 ## 关于私有 API 的说明
 

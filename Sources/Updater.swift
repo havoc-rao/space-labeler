@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import CryptoKit
 import Foundation
 
 /// Semantic version parsed from a tag or bundle string like "v0.1.0".
@@ -44,15 +45,25 @@ enum UpdaterConfig {
     static var latestReleaseURL: URL {
         URL(string: "https://api.github.com/repos/\(repo)/releases/latest")!
     }
+    /// Machine-readable metadata the release workflow commits to `main`.
+    /// Fetched from raw.githubusercontent.com — which has no API rate limit —
+    /// so regular check-ins never consume GitHub's anonymous API quota. The
+    /// `/releases/latest` API above remains the fallback.
+    static var latestMetadataURL: URL {
+        URL(string: "https://raw.githubusercontent.com/\(repo)/main/latest.json")!
+    }
 }
 
 /// Drives the "check for updates" state and the download-and-restart flow.
 ///
 /// The app is ad-hoc signed and not notarized, so updates ship as zip
-/// artifacts attached to GitHub Releases. The latest release is fetched from
-/// the public GitHub API — no signing keys, no Sparkle infrastructure. The
-/// installed bundle is replaced in place by a detached shell script that
-/// waits for this process to exit, then relaunches the new version.
+/// artifacts attached to GitHub Releases. The release workflow publishes a
+/// small `latest.json` (version + direct download URL + SHA-256) to `main`;
+/// the app reads that from raw.githubusercontent.com first — no signing keys,
+/// no Sparkle infrastructure, no GitHub API rate limit — and falls back to
+/// the public `releases/latest` API. The installed bundle is replaced in
+/// place by a detached shell script that waits for this process to exit,
+/// then relaunches the new version.
 @MainActor
 final class UpdaterState: ObservableObject {
     enum UpdateState: Equatable {
@@ -79,6 +90,7 @@ final class UpdaterState: ObservableObject {
     private static let lastCheckKey = "updater.lastCheckDate"
     private static let latestVersionKey = "updater.latestVersion"
     private static let latestDownloadURLKey = "updater.latestDownloadURL"
+    private static let latestSHA256Key = "updater.latestSHA256"
 
     private let defaults: UserDefaults
     private let session: URLSession
@@ -111,17 +123,14 @@ final class UpdaterState: ObservableObject {
         guard state != .checking else { return }
         state = .checking
         do {
-            let release = try await Self.fetchLatestRelease(session: session)
+            let info = try await Self.fetchUpdateInfo(session: session)
             defaults.set(Date(), forKey: Self.lastCheckKey)
-            guard let latest = AppVersion(raw: release.tagName) else {
-                state = .failed("Unrecognized latest release tag: \(release.tagName)")
-                return
+            defaults.set(info.version.description, forKey: Self.latestVersionKey)
+            defaults.set(info.downloadURL.absoluteString, forKey: Self.latestDownloadURLKey)
+            if let sha256 = info.sha256 {
+                defaults.set(sha256, forKey: Self.latestSHA256Key)
             }
-            defaults.set(latest.description, forKey: Self.latestVersionKey)
-            if let url = release.zipAsset?.browserDownloadURL {
-                defaults.set(url.absoluteString, forKey: Self.latestDownloadURLKey)
-            }
-            state = latest > Self.currentVersion ? .updateAvailable(latest) : .upToDate
+            state = info.version > Self.currentVersion ? .updateAvailable(info.version) : .upToDate
         } catch {
             // Prefer showing a cached update over surfacing a network error.
             if let cached = cachedLatestVersion, cached > Self.currentVersion {
@@ -141,7 +150,11 @@ final class UpdaterState: ObservableObject {
         isDownloading = true
         Task {
             do {
-                let newApp = try await Self.downloadAndExtract(url: url, session: session)
+                let newApp = try await Self.downloadAndExtract(
+                    url: url,
+                    session: session,
+                    expectedSHA256: cachedSHA256
+                )
                 state = .applying
                 try Self.launchInstaller(newApp: newApp)
                 NSApp.terminate(nil)
@@ -168,12 +181,17 @@ final class UpdaterState: ObservableObject {
         guard let s = defaults.string(forKey: Self.latestDownloadURLKey) else { return nil }
         return URL(string: s)
     }
+
+    private var cachedSHA256: String? {
+        defaults.string(forKey: Self.latestSHA256Key)
+    }
 }
 
 private enum UpdateError: LocalizedError {
     case httpStatus(Int)
     case noZipAsset
     case invalidArchive
+    case checksumMismatch
     case processFailed(String)
 
     var errorDescription: String? {
@@ -181,9 +199,26 @@ private enum UpdateError: LocalizedError {
         case .httpStatus(let code): return "HTTP \(code)"
         case .noZipAsset: return "Latest release has no zip asset"
         case .invalidArchive: return "Downloaded archive does not contain SpaceLabeler.app"
+        case .checksumMismatch: return "Downloaded update failed SHA-256 verification"
         case .processFailed(let message): return message
         }
     }
+}
+
+/// Shape of the repo's `latest.json` — written to `main` by the release
+/// workflow, so the app can learn about new versions without paying GitHub's
+/// API rate limit. `sha256` is the zip's digest, verified before install.
+private struct LatestMetadata: Decodable {
+    let version: String
+    let url: String
+    let sha256: String?
+}
+
+/// Resolved "what to install" from either metadata source.
+private struct UpdateInfo {
+    let version: AppVersion
+    let downloadURL: URL
+    let sha256: String?
 }
 
 /// Shape of the `GET /repos/{owner}/{repo}/releases/latest` response we care
@@ -214,23 +249,60 @@ private struct GitHubRelease: Decodable {
 }
 
 extension UpdaterState {
-    fileprivate static func fetchLatestRelease(session: URLSession) async throws -> GitHubRelease {
+    /// Latest release metadata: prefers the repo's `latest.json` (no API rate
+    /// limit), falling back to the GitHub `releases/latest` API — which is the
+    /// only source until a release has been built with the publishing step.
+    fileprivate static func fetchUpdateInfo(session: URLSession) async throws -> UpdateInfo {
+        if let info = try? await fetchMetadata(session: session) {
+            return info
+        }
+        return try await fetchFromGitHubAPI(session: session)
+    }
+
+    /// Reads `latest.json` from raw.githubusercontent.com. Returns nil when the
+    /// repo hasn't published one yet (404) or it is malformed.
+    fileprivate static func fetchMetadata(session: URLSession) async throws -> UpdateInfo? {
+        var request = URLRequest(url: UpdaterConfig.latestMetadataURL)
+        request.timeoutInterval = 10
+        request.setValue("SpaceLabeler/\(currentVersion)", forHTTPHeaderField: "User-Agent")
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200,
+            let meta = try? JSONDecoder().decode(LatestMetadata.self, from: data),
+            let version = AppVersion(raw: meta.version),
+            let url = URL(string: meta.url)
+        else { return nil }
+        return UpdateInfo(version: version, downloadURL: url, sha256: meta.sha256)
+    }
+
+    /// Legacy source: the GitHub `releases/latest` API. The asset's checksum
+    /// is unknown here, so the downloaded zip is not verified — keep using
+    /// `latest.json` (checksummed) by publishing releases with the workflow's
+    /// "Publish latest.json" step.
+    fileprivate static func fetchFromGitHubAPI(session: URLSession) async throws -> UpdateInfo {
         var request = URLRequest(url: UpdaterConfig.latestReleaseURL)
         request.timeoutInterval = 10
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        request.setValue("SpaceLabeler/\(Self.currentVersion)", forHTTPHeaderField: "User-Agent")
+        request.setValue("SpaceLabeler/\(currentVersion)", forHTTPHeaderField: "User-Agent")
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
             throw UpdateError.httpStatus((response as? HTTPURLResponse)?.statusCode ?? -1)
         }
         let release = try JSONDecoder().decode(GitHubRelease.self, from: data)
-        guard release.zipAsset != nil else { throw UpdateError.noZipAsset }
-        return release
+        guard let zipAsset = release.zipAsset else { throw UpdateError.noZipAsset }
+        guard let version = AppVersion(raw: release.tagName) else {
+            throw UpdateError.processFailed("Unrecognized latest release tag: \(release.tagName)")
+        }
+        return UpdateInfo(version: version, downloadURL: zipAsset.browserDownloadURL, sha256: nil)
     }
 
-    /// Downloads the zip under Application Support and extracts it, returning
-    /// the staged SpaceLabeler.app bundle.
-    fileprivate static func downloadAndExtract(url: URL, session: URLSession) async throws -> URL {
+    /// Downloads the zip under Application Support, verifies its SHA-256 when
+    /// the expected digest is known, extracts it, and returns the staged
+    /// SpaceLabeler.app bundle.
+    fileprivate static func downloadAndExtract(
+        url: URL,
+        session: URLSession,
+        expectedSHA256: String?
+    ) async throws -> URL {
         let fm = FileManager.default
         let base = try fm.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
             .appendingPathComponent("SpaceLabeler", isDirectory: true)
@@ -244,12 +316,30 @@ extension UpdaterState {
         request.timeoutInterval = 120
         let (tmpURL, _) = try await session.download(for: request)
         try fm.moveItem(at: tmpURL, to: zipURL)
+
+        if let expectedSHA256 {
+            let digest = try sha256(of: zipURL)
+            guard digest == expectedSHA256.lowercased() else {
+                try? fm.removeItem(at: zipURL)
+                throw UpdateError.checksumMismatch
+            }
+        }
+
         try await runProcess("/usr/bin/ditto", ["-x", "-k", zipURL.path, stageURL.path])
         try? fm.removeItem(at: zipURL)
 
         let appURL = stageURL.appendingPathComponent("SpaceLabeler.app")
         guard fm.fileExists(atPath: appURL.path) else { throw UpdateError.invalidArchive }
         return appURL
+    }
+
+    /// Hex SHA-256 digest of a file, e.g. "f3316096…e26c8". Nonisolated so the
+    /// test target can lock the expected digest format down without actor hops.
+    nonisolated static func sha256(of url: URL) throws -> String {
+        let data = try Data(contentsOf: url)
+        return SHA256.hash(data: data)
+            .map { String(format: "%02x", $0) }
+            .joined()
     }
 
     /// Writes the swap-and-relaunch script and detaches it. The script waits

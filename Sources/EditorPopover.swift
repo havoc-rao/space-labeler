@@ -132,10 +132,16 @@ struct EditorPopover: View {
             Divider()
 
             HStack {
-                Button(L10n.t("button.preferences")) { showSettings = true }
-                    .buttonStyle(.plain)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 5) {
+                    Button(L10n.t("button.preferences")) { showSettings = true }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                    // The ⌘, toggle, like the ⌘R / ⌘F hints in the pills above.
+                    Text("⌘,")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.tertiary)
+                }
                 Spacer()
                 Text(appVersion)
                     .font(.system(size: 10))
@@ -534,12 +540,20 @@ struct EditorPopover: View {
     /// selected Space. While the search field owns the keyboard, ↑/↓/⏎
     /// keep steering the (filtered) list — launcher-style — and Esc first
     /// clears the filter, then exits the field. ⌘F focuses the search
-    /// field from the list. Keys are left alone while an input method is
+    /// field from the list; ⌘, toggles the Preferences view; ⌘R starts a
+    /// rename. Keys are left alone while an input method is
     /// composing (marked text), and other ⌃ combinations are passed
     /// through (the ^⇧↑ toggle hotkey must reach the app-level monitor).
     private func installKeyMonitor() {
         guard keyMonitor == nil else { return }
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [self] event in
+            // ⌘, toggles Preferences from anywhere in the popover — main
+            // list ⇄ settings — mirroring the footer button. Handled before
+            // the field/list branches so it works while a field is focused.
+            if event.keyCode == 43, event.modifierFlags.contains(.command) {
+                toggleSettings()
+                return nil
+            }
             // A text field (name or search) owns the keyboard right now.
             if let firstResponder = NSApp.keyWindow?.firstResponder, firstResponder is NSTextView {
                 switch event.keyCode {
@@ -774,6 +788,13 @@ struct EditorPopover: View {
             visibleRows.contains(where: { $0.id == id })
         else { return }
         jump(to: id)
+    }
+
+    /// ⌘, — toggles the Preferences view, exactly like the "偏好设置" button in
+    /// the footer: the first press shows it (main list → settings), the second
+    /// press closes it back to the list.
+    private func toggleSettings() {
+        showSettings.toggle()
     }
 
     /// ⌘R: bump the request token; the name field responds by grabbing focus

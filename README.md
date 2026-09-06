@@ -74,6 +74,12 @@ When the popover opens, focus stays on the "All Spaces" list (`↑`/`↓` move t
 
 Jumping posts a single "Switch to Desktop N" shortcut (`Ctrl+N`). SpaceLabeler automatically reads which desktop shortcuts are actually enabled on this machine: if the target desktop's shortcut isn't checked, you get a precise message ("Desktop N's shortcut is not enabled — check it in Mission Control") instead of a dead keystroke.
 
+### Jump back to the previous Space (^⇧←)
+
+`Ctrl+Shift+←` jumps straight back to the Space that was active a moment ago — no desktop counting, and it works with any number of Spaces. Keep pressing it to walk further back through your recent Space history. There is deliberately no `^⇧→` counterpart: desktops never move, and a forward key paired with the system's own `Ctrl+←` / `Ctrl+→` navigation would only invite misalignment — "previous Space" is a single, deterministic direction.
+
+This jump needs the same one-time setup as clicking a Space: the Accessibility permission and the enabled "Switch to Desktop 1…9" shortcuts.
+
 Open **Preferences…** — a **STATUS** self-check shows the live Accessibility grant state, the system's enabled Ctrl+N shortcuts (e.g. `1, 2, 3, 4`), and a "Request permission…" button that pops the system authorization dialog. If the toggle in System Settings won't stick — a classic symptom of stale permission records left behind by an older zip install — the **"Clean stale Accessibility records"** button wipes macOS's stored entries for this app (the same `sudo tccutil reset Accessibility` the Makefile's `install` target runs, with the admin password prompt handled by the system), then re-triggers the authorization dialog so you can re-grant once.
 
 Preferences also includes a **Language** picker (中文 by default, English available) — the UI switches immediately and persists.

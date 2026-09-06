@@ -9,12 +9,15 @@ final class StatusItemController {
     private let popover: NSPopover
     private let monitor: SpaceMonitor
     private let store: SpaceStore
+    private let history: SpaceHistory
     private let updater = UpdaterState()
     private var cancellables = Set<AnyCancellable>()
 
-    /// System-wide ^⇧↑ hotkey, registered via Carbon. Unlike NSEvent global
-    /// monitors, Carbon hotkeys do NOT require the Accessibility permission,
-    /// and the system delivers them to us before any frontmost app sees them.
+    /// System-wide ^⇧↑ (popover toggle) and ^⇧← (jump back to the
+    /// previously-active Space) hotkeys, registered via Carbon. Unlike
+    /// NSEvent global monitors, Carbon hotkeys do NOT require the
+    /// Accessibility permission, and the system delivers them to us before
+    /// any frontmost app sees them.
     private static let eventHandler: EventHandlerUPP = { _, eventRef, _ in
         var id = EventHotKeyID()
         GetEventParameter(
@@ -26,23 +29,34 @@ final class StatusItemController {
             nil,
             &id
         )
-        guard id.signature == hotKeySignature, id.id == hotKeyID else { return noErr }
-        Task { @MainActor in
-            shared?.togglePopover(nil)
+        guard id.signature == hotKeySignature else { return noErr }
+        switch id.id {
+        case popoverHotKeyID:
+            Task { @MainActor in
+                shared?.togglePopover(nil)
+            }
+        case backHotKeyID:
+            Task { @MainActor in
+                shared?.goBackToPreviousSpace()
+            }
+        default:
+            break
         }
         return noErr
     }
 
     private static let hotKeySignature: OSType = 0x5350_4C31  // "SPL1"
-    private static let hotKeyID: UInt32 = 1
+    private static let popoverHotKeyID: UInt32 = 1
+    private static let backHotKeyID: UInt32 = 2
     @MainActor private static weak var shared: StatusItemController?
 
-    private var hotKeyRef: EventHotKeyRef?
+    private var hotKeyRefs: [UInt32: EventHotKeyRef] = [:]
     private var eventHandlerRef: EventHandlerRef?
 
     init(monitor: SpaceMonitor, store: SpaceStore) {
         self.monitor = monitor
         self.store = store
+        self.history = SpaceHistory(jump: Self.performJump)
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         popover = NSPopover()
@@ -67,6 +81,14 @@ final class StatusItemController {
             }
             .store(in: &cancellables)
 
+        // Feed the ^⇧← back-to-previous history with every activation.
+        monitor.$currentSpaceID
+            .receive(on: RunLoop.main)
+            .sink { [weak self] id in
+                self?.history.recordArrival(id)
+            }
+            .store(in: &cancellables)
+
         // React to label edits (rename / recolor). While a name is being
         // edited the menu bar label is frozen: re-rendering on every
         // keystroke makes the status item's width change and jitters the
@@ -88,16 +110,17 @@ final class StatusItemController {
     }
 
     deinit {
-        if let hotKeyRef {
-            UnregisterEventHotKey(hotKeyRef)
+        for ref in hotKeyRefs.values {
+            UnregisterEventHotKey(ref)
         }
         if let eventHandlerRef {
             RemoveEventHandler(eventHandlerRef)
         }
     }
 
-    /// Registers the system-wide ^⇧↑ hotkey so the popover can be toggled from
-    /// any app without Accessibility permission.
+    /// Registers the system-wide ^⇧↑ (popover) and ^⇧← (jump back to the
+    /// previously-active Space) hotkeys so they work from any app without
+    /// the Accessibility permission.
     private func installHotKeys() {
         Self.shared = self
 
@@ -118,17 +141,50 @@ final class StatusItemController {
             return
         }
 
-        let id = EventHotKeyID(signature: Self.hotKeySignature, id: Self.hotKeyID)
-        let hotKeyStatus = RegisterEventHotKey(
-            UInt32(kVK_UpArrow),
-            UInt32(controlKey | shiftKey),
-            id,
-            GetApplicationEventTarget(),
-            0,
-            &hotKeyRef
-        )
-        if hotKeyStatus != noErr {
-            NSLog("SpaceLabeler: RegisterEventHotKey failed: %d", hotKeyStatus)
+        let hotKeys: [(id: UInt32, keycode: UInt32)] = [
+            (Self.popoverHotKeyID, UInt32(kVK_UpArrow)),
+            (Self.backHotKeyID, UInt32(kVK_LeftArrow)),
+        ]
+        for hotKey in hotKeys {
+            let id = EventHotKeyID(signature: Self.hotKeySignature, id: hotKey.id)
+            var ref: EventHotKeyRef?
+            let hotKeyStatus = RegisterEventHotKey(
+                hotKey.keycode,
+                UInt32(controlKey | shiftKey),
+                id,
+                GetApplicationEventTarget(),
+                0,
+                &ref
+            )
+            if hotKeyStatus != noErr {
+                NSLog("SpaceLabeler: RegisterEventHotKey %d failed: %d", hotKey.id, hotKeyStatus)
+            } else if let ref {
+                hotKeyRefs[hotKey.id] = ref
+            }
+        }
+    }
+
+    /// ^⇧← — jump back to the previously-active Space (repeat to walk
+    /// further back).
+    private func goBackToPreviousSpace() {
+        history.goBack()
+    }
+
+    /// Performs the back jump. Same requirements as clicking a Space in
+    /// the popover: Accessibility permission plus the enabled
+    /// "Switch to Desktop N" shortcuts. Failures stay silent (the hotkey
+    /// does nothing) except for a missing Accessibility grant, which pops
+    /// the system authorization dialog like the popover does.
+    private static func performJump(_ id: UInt64) -> Bool {
+        switch SkyLight.switchToSpace(id: id) {
+        case .success:
+            return true
+        case .accessibilityDenied:
+            SkyLight.promptForAccessibility()
+            return false
+        case .notFound, .indexTooHigh, .shortcutNotEnabled, .unavailable:
+            NSLog("SpaceLabeler: back jump to Space %llu failed", id)
+            return false
         }
     }
 

@@ -84,13 +84,11 @@ enum SkyLight {
     /// Outcome of `resetAccessibilityRecords()`.
     enum AccessibilityResetResult: Equatable {
         case success
-        case cancelled
         case failed(String)
     }
 
     /// Wipes macOS's stored Accessibility (TCC) records for this app — the
-    /// GUI equivalent of
-    /// `sudo tccutil reset Accessibility com.jeremywatt.SpaceLabeler`.
+    /// GUI equivalent of `tccutil reset Accessibility com.jeremywatt.SpaceLabeler`.
     /// Invoked by the Settings "Clean stale Accessibility records" flow and
     /// automatically by the update flow before it swaps in a new build.
     ///
@@ -101,30 +99,28 @@ enum SkyLight {
     /// clears the whole table for this bundle id so the next grant lands
     /// cleanly — this is what fixes a zip install that "can't be used".
     ///
-    /// Elevation goes through an in-process AppleScript `do shell script …
-    /// with administrator privileges`, which reuses the system's own
-    /// authorization dialog for the admin password — the app never handles
-    /// the password itself. Blocks on the main thread until the dialog is
-    /// dismissed (the security agent runs out-of-process, so the dialog UI
-    /// stays responsive).
+    /// User-level Accessibility records reset WITHOUT elevation: the running
+    /// user owns the TCC database entry, so tccutil succeeds with no admin
+    /// password prompt (verified on macOS 26). No AppleScript, no sudo.
     @MainActor
     static func resetAccessibilityRecords() -> AccessibilityResetResult {
         let bundleID = Bundle.main.bundleIdentifier ?? "com.jeremywatt.SpaceLabeler"
-        let source =
-            "do shell script \"/usr/bin/tccutil reset Accessibility \(bundleID)\" with administrator privileges"
-        var error: NSDictionary?
-        let script = NSAppleScript(source: source)
-        _ = script?.executeAndReturnError(&error)
-        guard let error else { return .success }
-        // AppleScript reports the user cancelling the authorization dialog
-        // as error -128 ("User canceled") — that is not a failure.
-        if (error[NSAppleScript.errorNumber] as? Int) == -128 {
-            return .cancelled
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/tccutil")
+        process.arguments = ["reset", "Accessibility", bundleID]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+        do {
+            try process.run()
+            process.waitUntilExit()
+        } catch {
+            return .failed(error.localizedDescription)
         }
-        let message =
-            (error[NSAppleScript.errorMessage] as? String)
-            ?? (error[NSAppleScript.errorBriefMessage] as? String)
-            ?? "Unknown AppleScript error"
+        if process.terminationStatus == 0 { return .success }
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        let message = String(data: data, encoding: .utf8)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? "tccutil exited \(process.terminationStatus)"
         return .failed(message)
     }
 

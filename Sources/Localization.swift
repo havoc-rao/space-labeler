@@ -94,12 +94,12 @@ enum L10n {
         "settings.resetAccessibility": "Clean stale Accessibility records",
         "settings.resetAccessibilityButton": "Reset…",
         "settings.resetAccessibilityHint":
-            "Wipes macOS's stored Accessibility records for Space Labeler (needs your admin password); the app then restarts and asks you to re-grant the permission once.",
+            "Wipes macOS's stored Accessibility records for Space Labeler (no admin password needed); the app then restarts and asks you to re-grant the permission once.",
         "settings.resetAccessibilityExplain":
-            "Ad-hoc installs change the app's signature every time — dead records can shadow a fresh grant, and the reset only takes effect after an app restart. Same `sudo tccutil reset Accessibility` the update flow runs before installing a new build.",
+            "Ad-hoc installs change the app's signature every time — dead records can shadow a fresh grant, and the reset only takes effect after an app restart. Same `tccutil reset Accessibility` the update flow runs before installing a new build.",
         "settings.resetPromptTitle": "Reset Accessibility records?",
         "settings.resetPromptMessage":
-            "This clears macOS's stored Accessibility permission for Space Labeler, including stale entries from older builds. You'll be asked for your admin password, then Space Labeler restarts and asks you to re-grant the permission.",
+            "This clears macOS's stored Accessibility permission for Space Labeler, including stale entries from older builds. Space Labeler then restarts and asks you to re-grant the permission.",
         "settings.resetPromptConfirm": "Reset & Restart",
         "settings.resetPromptCancel": "Cancel",
         "settings.restartRequiredTitle": "Restart required",
@@ -129,7 +129,7 @@ enum L10n {
         "settings.updateFailed": "Update check failed: %@",
         "settings.updatePromptTitle": "New version available",
         "settings.updatePromptMessage":
-            "v%@ is ready to install. The app will clear the old Accessibility records (you'll be asked for your admin password), quit, replace itself, relaunch, and then automatically re-request the Accessibility permission.\n\nNote: this build is ad-hoc signed, so macOS may reset the Accessibility permission. Just approve the prompt after relaunching (or re-enable Space Labeler in System Settings → Privacy & Security → Accessibility if jumping (Ctrl+N) stops working).",
+            "v%@ is ready to install. The app will clear the old Accessibility records, quit, replace itself, relaunch, and then automatically re-request the Accessibility permission.\n\nNote: this build is ad-hoc signed, so macOS may reset the Accessibility permission. Just approve the prompt after relaunching (or re-enable Space Labeler in System Settings → Privacy & Security → Accessibility if jumping (Ctrl+N) stops working).",
         "settings.updatePromptDownload": "Download & Restart",
         "settings.updatePromptCancel": "Cancel",
     ]
@@ -181,12 +181,12 @@ enum L10n {
         "settings.resetAccessibility": "清理旧的辅助功能权限记录",
         "settings.resetAccessibilityButton": "重置…",
         "settings.resetAccessibilityHint":
-            "清除 macOS 中存储的 Space Labeler 辅助功能权限记录（需要输入管理员密码），之后应用会重启并重新请求授权。",
+            "清除 macOS 中存储的 Space Labeler 辅助功能权限记录（无需管理员密码），之后应用会重启并重新请求授权。",
         "settings.resetAccessibilityExplain":
-            "每次安装都会改变 ad-hoc 签名，旧记录可能遮挡新授权；且重置需要重启应用后才会生效。等价于 `sudo tccutil reset Accessibility`（应用内更新在替换新版前也会自动执行同样的清理）。",
+            "每次安装都会改变 ad-hoc 签名，旧记录可能遮挡新授权；且重置需要重启应用后才会生效。等价于 `tccutil reset Accessibility`（应用内更新在替换新版前也会自动执行同样的清理）。",
         "settings.resetPromptTitle": "重置辅助功能权限记录？",
         "settings.resetPromptMessage":
-            "这会清除 macOS 中存储的 Space Labeler 辅助功能权限（包括旧版本遗留的失效记录）。系统会要求输入管理员密码，随后应用将重启并自动请求你重新授权。",
+            "这会清除 macOS 中存储的 Space Labeler 辅助功能权限（包括旧版本遗留的失效记录），随后应用将重启并自动请求你重新授权。",
         "settings.resetPromptConfirm": "重置并重启",
         "settings.resetPromptCancel": "取消",
         "settings.restartRequiredTitle": "需要重启",
@@ -216,7 +216,7 @@ enum L10n {
         "settings.updateFailed": "检查更新失败：%@",
         "settings.updatePromptTitle": "发现新版本",
         "settings.updatePromptMessage":
-            "v%@ 已就绪。应用将先清除旧的辅助功能权限记录（需要输入管理员密码），再退出、替换自身并重新启动，重启后会自动重新请求辅助功能权限。\n\n注意：本应用为 ad-hoc 签名，更新后 macOS 可能重置辅助功能权限——请在重启后的授权窗口中允许（若跳转（Ctrl+N）仍失效，请到「系统设置 → 隐私与安全性 → 辅助功能」重新开启 Space Labeler）。",
+            "v%@ 已就绪。应用将先清除旧的辅助功能权限记录，再退出、替换自身并重新启动，重启后会自动重新请求辅助功能权限。\n\n注意：本应用为 ad-hoc 签名，更新后 macOS 可能重置辅助功能权限——请在重启后的授权窗口中允许（若跳转（Ctrl+N）仍失效，请到「系统设置 → 隐私与安全性 → 辅助功能」重新开启 Space Labeler）。",
         "settings.updatePromptDownload": "下载并重启",
         "settings.updatePromptCancel": "取消",
     ]

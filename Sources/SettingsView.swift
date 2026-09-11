@@ -227,10 +227,11 @@ struct SettingsView: View {
         }
     }
 
-    /// Runs the elevated `tccutil reset Accessibility`, then requires a
-    /// restart: the running process still holds the grant macOS snapshotted
-    /// at launch, so the permission can only be re-granted after the app
-    /// relaunches (which then re-requests it automatically).
+    /// Runs `tccutil reset Accessibility` (user-level records reset without
+    /// sudo, so there is no password prompt), then requires a restart: the
+    /// running process still holds the grant macOS snapshotted at launch, so
+    /// the permission can only be re-granted after the app relaunches (which
+    /// then re-requests it automatically).
     private func performAccessibilityReset() {
         isResetting = true
         let result = SkyLight.resetAccessibilityRecords()
@@ -240,8 +241,6 @@ struct SettingsView: View {
         switch result {
         case .success:
             confirmRestartAfterReset()
-        case .cancelled:
-            break
         case .failed(let message):
             let alert = NSAlert()
             alert.messageText = L10n.t("settings.resetFailedTitle")

@@ -158,9 +158,9 @@ final class UpdaterState: ObservableObject {
                 state = .applying
                 // A reinstall swaps in a freshly ad-hoc-signed binary, so the
                 // old TCC records are dead weight that can shadow the new
-                // grant — clear them (elevated, admin prompt handled by the
-                // system) before the swap. Best-effort: a cancelled or failed
-                // reset must not block the update.
+                // grant — clear them before the swap (user-level records
+                // reset without sudo, so this is silent). Best-effort: a
+                // failed reset must not block the update.
                 _ = SkyLight.resetAccessibilityRecords()
                 try Self.launchInstaller(newApp: newApp)
                 // The new build is ad-hoc signed differently, so macOS may

@@ -42,6 +42,11 @@ struct EditorPopover: View {
     /// Monotonic token bumped when the popover opens; the search field
     /// reacts by grabbing focus so typing filters immediately.
     @State private var searchFocusToken = 0
+    /// Guards re-entrancy while the type-to-filter keystroke is being
+    /// replayed into the search field (it passes through this monitor
+    /// again, which is expected — the guard only backstops a broken focus
+    /// state from recursing forever).
+    @State private var typeToFilterReplaying = false
 
     /// Space rows in 桌面 1, 2, 3… order (global desktop number across all
     /// displays). Spaces whose "Desktop N" number is gone — deleted Spaces,
@@ -618,6 +623,13 @@ struct EditorPopover: View {
                 if self.handleDigitKey(event) {
                     return nil
                 }
+                // Type-to-filter: any unmodified printable key focuses the
+                // search field and replays the event into it, so the whole
+                // popover behaves like a launcher — characters filter the
+                // list live while ↑/↓/⏎ keep steering it.
+                if self.startTypeToFilter(event) {
+                    return nil
+                }
                 return event
             }
         }
@@ -725,7 +737,7 @@ struct EditorPopover: View {
     }
 
     private func selectByDigit(_ digit: Int) {
-        if let desktopNumbers {
+        if desktopNumbers != nil {
             guard let row = visibleRows.first(where: { $0.desktop == digit }) else { return }
             selectedID = row.id
         } else {
@@ -808,6 +820,53 @@ struct EditorPopover: View {
     /// away.
     private func startFind() {
         searchFocusToken += 1
+    }
+
+    /// List-focused type-to-filter: an unmodified printable key (digits 1–9
+    /// are consumed earlier by `handleDigitKey`, which moves the selection
+    /// instead) synchronously focuses the search field and replays the
+    /// original event into it. The replayed event passes through the local
+    /// monitor again, this time hitting the text-field branch with
+    /// `searchActive` set — it is released into the field editor, so the
+    /// character lands in the filter with full IME composition support.
+    /// After the first keystroke the search field owns typing while the
+    /// list keeps ↑/↓/⏎ (existing `searchActive` handling).
+    private func startTypeToFilter(_ event: NSEvent) -> Bool {
+        guard !typeToFilterReplaying else { return false }
+        guard event.modifierFlags.intersection([.command, .control, .option]).isEmpty,
+            let chars = event.characters,
+            !chars.isEmpty,
+            !chars.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) })
+        else { return false }
+        // Resolve the field on demand from the live view hierarchy: state
+        // captured in a representable's make/updateNSView is unreliable
+        // (SwiftUI ignores state writes during a view update), but the
+        // hierarchy is always current when a key event arrives.
+        guard let field = searchFieldInHierarchy(), let window = field.window else { return false }
+        window.makeFirstResponder(field)
+        searchActive = true
+        typeToFilterReplaying = true
+        window.sendEvent(event)
+        typeToFilterReplaying = false
+        return true
+    }
+
+    /// Finds the search field's NSTextField in the key window's view
+    /// hierarchy by its stable identifier.
+    private func searchFieldInHierarchy() -> NSTextField? {
+        guard let contentView = NSApp.keyWindow?.contentView else { return nil }
+        return findSearchField(in: contentView)
+    }
+
+    private func findSearchField(in view: NSView) -> NSTextField? {
+        if let field = view as? NSTextField,
+            field.identifier == SearchTextField.searchFieldIdentifier {
+            return field
+        }
+        for subview in view.subviews {
+            if let field = findSearchField(in: subview) { return field }
+        }
+        return nil
     }
 
     /// Esc while renaming: give keyboard control (↑/↓/⏎) back to the list.
@@ -925,6 +984,10 @@ private struct RenameTextField: NSViewRepresentable {
 /// `RenameTextField`, the delegate reports every change (IME composition
 /// included) so the list filters live while pinyin is still being marked.
 private struct SearchTextField: NSViewRepresentable {
+    /// Stable identifier so the popover's key monitor can find this field
+    /// in the live view hierarchy (list-focused type-to-filter).
+    static let searchFieldIdentifier = NSUserInterfaceItemIdentifier("spaceLabeler.searchField")
+
     @Binding var text: String
     var placeholder: String
     /// Increment to request focus (+ select-all), e.g. on popover open.
@@ -942,6 +1005,7 @@ private struct SearchTextField: NSViewRepresentable {
         field.focusRingType = .none
         field.font = .systemFont(ofSize: 12)
         field.lineBreakMode = .byTruncatingTail
+        field.identifier = Self.searchFieldIdentifier
         field.delegate = context.coordinator
         return field
     }

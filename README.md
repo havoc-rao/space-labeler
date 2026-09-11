@@ -80,7 +80,7 @@ Jumping posts a single "Switch to Desktop N" shortcut (`Ctrl+N`). SpaceLabeler a
 
 This jump needs the same one-time setup as clicking a Space: the Accessibility permission and the enabled "Switch to Desktop 1…9" shortcuts.
 
-Open **Preferences…** — a **STATUS** self-check shows the live Accessibility grant state, the system's enabled Ctrl+N shortcuts (e.g. `1, 2, 3, 4`), and a "Request permission…" button that pops the system authorization dialog. If the toggle in System Settings won't stick — a classic symptom of stale permission records left behind by an older zip install — the **"Clean stale Accessibility records"** button wipes macOS's stored entries for this app (the same `sudo tccutil reset Accessibility` the Makefile's `install` target runs, with the admin password prompt handled by the system), then re-triggers the authorization dialog so you can re-grant once.
+Open **Preferences…** — a **STATUS** self-check shows the live Accessibility grant state, the system's enabled Ctrl+N shortcuts (e.g. `1, 2, 3, 4`), and a "Request permission…" button that pops the system authorization dialog. If the toggle in System Settings won't stick — a classic symptom of stale permission records left behind by an older zip install — the **"Clean stale Accessibility records"** button wipes macOS's stored entries for this app (the equivalent of `sudo tccutil reset Accessibility` — the same cleanup in-app updates run automatically before swapping in a new build, with the admin password prompt handled by the system). The app then **restarts — which is required**: macOS caches the grant for the currently running process, so the reset only takes effect on a fresh launch. After the relaunch it automatically re-requests the authorization, so you re-grant once.
 
 Preferences also includes a **Language** picker (中文 by default, English available) — the UI switches immediately and persists.
 
@@ -88,11 +88,11 @@ Labels and colors persist across reboots in `UserDefaults` under the key `SpaceL
 
 ### Updates
 
-On launch the app silently checks for a new release (at most once per day). Open **Preferences…** → **UPDATES** to run a manual "Check for Updates…" at any time; when a new version is found, hit **Download & Restart** and the app quits, replaces itself in place, and relaunches.
+On launch the app silently checks for a new release (at most once per day). Open **Preferences…** → **UPDATES** to run a manual "Check for Updates…" at any time; when a new version is found, hit **Download & Restart** and the app first clears the old Accessibility records (your admin password is requested by the system), then quits, replaces itself in place, relaunches, and automatically re-requests the permission.
 
 The check reads a small `latest.json` (version + direct zip URL + SHA-256) committed to the repo's `main` branch by the release workflow — no GitHub API rate limit — and verifies the downloaded zip against that SHA-256 before installing. If `latest.json` is absent it falls back to the GitHub releases API.
 
-Note: every build carries a fresh ad-hoc signature, so macOS may reset the Accessibility grant — if jumping (Ctrl+N) stops working after an update, re-enable Space Labeler in System Settings → Privacy & Security → Accessibility. If the toggle is stuck, use Preferences → STATUS → **Clean stale Accessibility records** instead. The update source repo is configured in one constant, `UpdaterConfig.repo` in `Sources/Updater.swift`, so it's easy to change if the repository moves.
+Note: every build carries a fresh ad-hoc signature, so macOS may reset the Accessibility grant — after the update restarts the app it automatically re-requests the permission, just approve the prompt. If jumping (Ctrl+N) still stops working after an update, re-enable Space Labeler in System Settings → Privacy & Security → Accessibility. If the toggle is stuck, use Preferences → STATUS → **Clean stale Accessibility records** instead (that flow restarts the app). The update source repo is configured in one constant, `UpdaterConfig.repo` in `Sources/Updater.swift`, so it's easy to change if the repository moves.
 
 ## Development
 

@@ -40,17 +40,15 @@ install: build
 	-pkill -x SpaceLabeler 2>/dev/null
 	rm -rf $(HOME)/Applications/$(APP_NAME)
 	cp -R $(BUILD_DIR)/Build/Products/Release/$(APP_NAME) $(HOME)/Applications/
-	# Reset stale Accessibility TCC records: ad-hoc resigning changes the code
-	# fingerprint on every build, so macOS accumulates dead entries under the
-	# same bundle id that can shadow the fresh grant. May prompt for sudo.
-	@echo ""
-	@echo "Clearing stale Accessibility records for $(LABEL)…"
-	@sudo tccutil reset Accessibility $(LABEL) || echo "  skipped — if jumping fails, run manually: sudo tccutil reset Accessibility $(LABEL)"
-	@echo ""
-	@echo "NOTE: re-grant Accessibility once for this build if the STATUS check shows"
-	@echo "not granted (or jumping fails):"
-	@echo "  System Settings -> Privacy & Security -> Accessibility"
-	@echo "  -> toggle Space Labeler OFF then ON (or delete + re-add the entry)"
+	# No TCC surgery here anymore: ad-hoc resigning changes the code
+	# fingerprint on every build, so the previous Accessibility grant no
+	# longer applies. Mark the next launch to re-request it — the app pops
+	# the system authorization dialog itself. Record cleanup also lives in
+	# the app: in-app updates clear stale records automatically before
+	# swapping in a new build, or via Preferences -> STATUS -> "Clean stale
+	# Accessibility records" (sudo prompt handled by the system).
+	@defaults write $(LABEL) relaunch.pendingAccessibilityReGrant -bool YES
+	@echo "On next launch, the app will ask you to re-grant the Accessibility permission."
 	@if [ -f "$(HOME)/Library/LaunchAgents/$(LABEL).plist" ]; then \
 	  echo "LaunchAgent detected — restarting managed instance"; \
 	  launchctl kickstart -k "gui/$$(id -u)/$(LABEL)"; \

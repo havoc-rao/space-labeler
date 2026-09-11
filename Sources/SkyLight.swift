@@ -89,9 +89,10 @@ enum SkyLight {
     }
 
     /// Wipes macOS's stored Accessibility (TCC) records for this app — the
-    /// GUI equivalent of the Makefile's
-    /// `sudo tccutil reset Accessibility com.jeremywatt.SpaceLabeler`
-    /// (the `install` target runs it after every build).
+    /// GUI equivalent of
+    /// `sudo tccutil reset Accessibility com.jeremywatt.SpaceLabeler`.
+    /// Invoked by the Settings "Clean stale Accessibility records" flow and
+    /// automatically by the update flow before it swaps in a new build.
     ///
     /// Every release is ad-hoc signed, so the code signature changes on each
     /// install/update. macOS keeps the old dead TCC entries under the same

@@ -227,8 +227,10 @@ struct SettingsView: View {
         }
     }
 
-    /// Runs the elevated `tccutil reset Accessibility`, then re-triggers the
-    /// system authorization dialog so the user can re-grant immediately.
+    /// Runs the elevated `tccutil reset Accessibility`, then requires a
+    /// restart: the running process still holds the grant macOS snapshotted
+    /// at launch, so the permission can only be re-granted after the app
+    /// relaunches (which then re-requests it automatically).
     private func performAccessibilityReset() {
         isResetting = true
         let result = SkyLight.resetAccessibilityRecords()
@@ -237,11 +239,7 @@ struct SettingsView: View {
 
         switch result {
         case .success:
-            // The table is clean now — pop the system dialog right away so
-            // the fresh grant lands in it instead of next to dead entries.
-            if !axTrusted {
-                SkyLight.promptForAccessibility()
-            }
+            confirmRestartAfterReset()
         case .cancelled:
             break
         case .failed(let message):
@@ -251,6 +249,23 @@ struct SettingsView: View {
             alert.addButton(withTitle: L10n.t("settings.ok"))
             alert.alertStyle = .critical
             alert.runModal()
+        }
+    }
+
+    /// The records are wiped but the live process keeps the launch-time grant
+    /// — a restart is the mandatory next step. On accept, relaunches the app
+    /// with a pending re-request so the fresh process asks for the permission
+    /// again by itself.
+    private func confirmRestartAfterReset() {
+        let alert = NSAlert()
+        alert.messageText = L10n.t("settings.restartRequiredTitle")
+        alert.informativeText = L10n.t("settings.restartRequiredMessage")
+        alert.addButton(withTitle: L10n.t("settings.restartNow"))
+        alert.addButton(withTitle: L10n.t("settings.restartLater"))
+        alert.alertStyle = .informational
+        if alert.runModal() == .alertFirstButtonReturn {
+            RelaunchFlow.scheduleAccessibilityReGrant()
+            RelaunchFlow.relaunch()
         }
     }
 
@@ -296,13 +311,15 @@ struct SettingsView: View {
                 }
             }
 
-            // Clears macOS's stored Accessibility records for this app — the
-            // in-app equivalent of `sudo tccutil reset Accessibility` in the
-            // Makefile. Ad-hoc installs (zip updates in particular) change
-            // the code signature on every build, so dead TCC entries can
-            // accumulate under the same bundle id and shadow a fresh grant,
-            // leaving the STATUS check stuck on "not granted". The reset
-            // wipes them so the user can re-grant cleanly.
+            // Clears macOS's stored Accessibility records for this app —
+            // `sudo tccutil reset Accessibility` from inside the app, the
+            // same cleanup the update flow runs automatically before
+            // swapping in a new build. Ad-hoc installs (zip updates in
+            // particular) change the code signature on every build, so dead
+            // TCC entries can accumulate under the same bundle id and shadow
+            // a fresh grant, leaving the STATUS check stuck on "not
+            // granted". The reset wipes them so the user can re-grant
+            // cleanly.
             HStack(spacing: 8) {
                 Text(L10n.t("settings.resetAccessibility"))
                     .font(.system(size: 12))

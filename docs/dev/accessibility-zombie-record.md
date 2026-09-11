@@ -91,6 +91,7 @@ open ~/Applications/SpaceLabeler.app
 ## 4. 同类问题防复发
 
 - 每次 `make install` / 重装后，**若跳转失效先看 STATUS 面板**（环境自检实时显示授权状态与启用的数字快捷键），不要再盲 toggle。
+- （2026-09 更新）`make install` 已不再执行 `sudo tccutil reset`：安装后应用首次启动会自动重新请求辅助功能权限；应用内更新会在替换新版前自动清除旧记录（管理员密码由系统弹窗处理）；也可随时用 Preferences… → STATUS → 「清理旧的辅助功能权限记录」手动清理（该流程会强制重启应用后再请求授权）。
 - ad-hoc 签名决定「每次构建指纹必变」是根因；若想一劳永逸，改用 **Developer ID 证书签名**（TCC 按签名匹配，内容更新不影响授权），见 README 相关讨论。
 - 兜底终极手段（仅确认重置流程走不通时）：改 bundle id 强制重置，代价是 Space 标签数据与 LaunchAgent 需同步迁移。
 

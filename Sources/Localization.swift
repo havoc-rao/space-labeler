@@ -88,19 +88,25 @@ enum L10n {
         "settings.selfCheckHint":
             "Jumping posts Ctrl+N — the Accessibility permission and the target desktop's “Switch to Desktop N” shortcut must both be enabled, and the target Space must be on the current display.",
 
-        // Accessibility record reset (SettingsView) — mirrors the Makefile's
-        // `sudo tccutil reset Accessibility` in the `install` target.
+        // Accessibility record reset (SettingsView) — the GUI equivalent of
+        // `sudo tccutil reset Accessibility`; the update flow runs the same
+        // cleanup automatically before swapping in a new build.
         "settings.resetAccessibility": "Clean stale Accessibility records",
         "settings.resetAccessibilityButton": "Reset…",
         "settings.resetAccessibilityHint":
-            "Wipes macOS's stored Accessibility records for Space Labeler (needs your admin password); you'll then re-grant the permission once.",
+            "Wipes macOS's stored Accessibility records for Space Labeler (needs your admin password); the app then restarts and asks you to re-grant the permission once.",
         "settings.resetAccessibilityExplain":
-            "Ad-hoc installs change the app's signature every time — dead records can shadow a fresh grant. Same as `sudo tccutil reset Accessibility` in the Makefile.",
+            "Ad-hoc installs change the app's signature every time — dead records can shadow a fresh grant, and the reset only takes effect after an app restart. Same `sudo tccutil reset Accessibility` the update flow runs before installing a new build.",
         "settings.resetPromptTitle": "Reset Accessibility records?",
         "settings.resetPromptMessage":
-            "This clears macOS's stored Accessibility permission for Space Labeler, including stale entries from older builds. You'll be asked for your admin password, and the system will then ask you to re-grant the permission.",
-        "settings.resetPromptConfirm": "Reset & Re-grant",
+            "This clears macOS's stored Accessibility permission for Space Labeler, including stale entries from older builds. You'll be asked for your admin password, then Space Labeler restarts and asks you to re-grant the permission.",
+        "settings.resetPromptConfirm": "Reset & Restart",
         "settings.resetPromptCancel": "Cancel",
+        "settings.restartRequiredTitle": "Restart required",
+        "settings.restartRequiredMessage":
+            "The Accessibility records have been cleared, but macOS caches the permission for the currently running app — a restart is required to pick up the reset. Space Labeler will relaunch and automatically ask you to re-grant the Accessibility permission.",
+        "settings.restartNow": "Restart Now",
+        "settings.restartLater": "Later",
         "settings.resetFailedTitle": "Reset failed",
         "settings.resetFailedMessage": "Couldn't clear the Accessibility records: %@",
         "settings.ok": "OK",
@@ -123,7 +129,7 @@ enum L10n {
         "settings.updateFailed": "Update check failed: %@",
         "settings.updatePromptTitle": "New version available",
         "settings.updatePromptMessage":
-            "v%@ is ready to install. The app will quit, replace itself and relaunch.\n\nNote: this build is ad-hoc signed, so macOS may reset the Accessibility permission. If jumping (Ctrl+N) stops working afterwards, re-enable Space Labeler in System Settings → Privacy & Security → Accessibility.",
+            "v%@ is ready to install. The app will clear the old Accessibility records (you'll be asked for your admin password), quit, replace itself, relaunch, and then automatically re-request the Accessibility permission.\n\nNote: this build is ad-hoc signed, so macOS may reset the Accessibility permission. Just approve the prompt after relaunching (or re-enable Space Labeler in System Settings → Privacy & Security → Accessibility if jumping (Ctrl+N) stops working).",
         "settings.updatePromptDownload": "Download & Restart",
         "settings.updatePromptCancel": "Cancel",
     ]
@@ -170,19 +176,24 @@ enum L10n {
         "settings.digitsValueNone": "未启用任何数字快捷键——请勾选「切换到桌面 1…9」",
         "settings.selfCheckHint": "跳转通过发送 Ctrl+N 实现：需要辅助功能权限已授权、目标桌面的「切换到桌面 N」快捷键已勾选、目标 Space 在当前屏幕。",
 
-        // 清理辅助功能权限记录（SettingsView）——与 Makefile `install` 目标中的
-        // `sudo tccutil reset Accessibility` 等价。
+        // 清理辅助功能权限记录（SettingsView）——即 `sudo tccutil reset Accessibility`；
+        // 应用内更新在替换新版前也会自动执行同样的清理。
         "settings.resetAccessibility": "清理旧的辅助功能权限记录",
         "settings.resetAccessibilityButton": "重置…",
         "settings.resetAccessibilityHint":
-            "清除 macOS 中存储的 Space Labeler 辅助功能权限记录（需要输入管理员密码），之后需重新授权一次。",
+            "清除 macOS 中存储的 Space Labeler 辅助功能权限记录（需要输入管理员密码），之后应用会重启并重新请求授权。",
         "settings.resetAccessibilityExplain":
-            "每次安装都会改变 ad-hoc 签名，旧记录可能遮挡新授权。等价于 Makefile 中的 `sudo tccutil reset Accessibility`。",
+            "每次安装都会改变 ad-hoc 签名，旧记录可能遮挡新授权；且重置需要重启应用后才会生效。等价于 `sudo tccutil reset Accessibility`（应用内更新在替换新版前也会自动执行同样的清理）。",
         "settings.resetPromptTitle": "重置辅助功能权限记录？",
         "settings.resetPromptMessage":
-            "这会清除 macOS 中存储的 Space Labeler 辅助功能权限（包括旧版本遗留的失效记录）。系统会要求输入管理员密码，随后会弹出授权窗口，请重新授权。",
-        "settings.resetPromptConfirm": "重置并重新授权",
+            "这会清除 macOS 中存储的 Space Labeler 辅助功能权限（包括旧版本遗留的失效记录）。系统会要求输入管理员密码，随后应用将重启并自动请求你重新授权。",
+        "settings.resetPromptConfirm": "重置并重启",
         "settings.resetPromptCancel": "取消",
+        "settings.restartRequiredTitle": "需要重启",
+        "settings.restartRequiredMessage":
+            "辅助功能权限记录已清除，但 macOS 会缓存当前运行进程的授权状态——必须重启应用才能生效。Space Labeler 将重新启动，并自动弹出授权窗口，请重新授权。",
+        "settings.restartNow": "立即重启",
+        "settings.restartLater": "稍后",
         "settings.resetFailedTitle": "重置失败",
         "settings.resetFailedMessage": "无法清除辅助功能权限记录：%@",
         "settings.ok": "好",
@@ -205,7 +216,7 @@ enum L10n {
         "settings.updateFailed": "检查更新失败：%@",
         "settings.updatePromptTitle": "发现新版本",
         "settings.updatePromptMessage":
-            "v%@ 已就绪，应用将退出、替换自身并重新启动。\n\n注意：本应用为 ad-hoc 签名，更新后 macOS 可能重置辅助功能权限。若跳转（Ctrl+N）失效，请重新在「系统设置 → 隐私与安全性 → 辅助功能」中开启 Space Labeler。",
+            "v%@ 已就绪。应用将先清除旧的辅助功能权限记录（需要输入管理员密码），再退出、替换自身并重新启动，重启后会自动重新请求辅助功能权限。\n\n注意：本应用为 ad-hoc 签名，更新后 macOS 可能重置辅助功能权限——请在重启后的授权窗口中允许（若跳转（Ctrl+N）仍失效，请到「系统设置 → 隐私与安全性 → 辅助功能」重新开启 Space Labeler）。",
         "settings.updatePromptDownload": "下载并重启",
         "settings.updatePromptCancel": "取消",
     ]

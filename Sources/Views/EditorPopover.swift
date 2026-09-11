@@ -94,6 +94,10 @@ struct EditorPopover: View {
         }
         .frame(width: 290)
         .onAppear {
+            // Every reopen lands on the main view: if the popover was last
+            // closed while Preferences was showing, showSettings would
+            // otherwise persist and reopen on the settings page.
+            showSettings = false
             refreshDesktopNumbers()
             syncBuffer()
             searchText = ""

@@ -62,13 +62,7 @@ final class StatusItemController {
         popover = NSPopover()
         popover.behavior = .transient
         popover.contentSize = NSSize(width: 290, height: 450)
-        popover.contentViewController = NSHostingController(
-            rootView: EditorPopover(
-                monitor: monitor, store: store, updater: updater,
-                onJump: { [weak self] in
-                    self?.popover.performClose(nil)
-                })
-        )
+        popover.contentViewController = makeContentController()
 
         statusItem.button?.target = self
         statusItem.button?.action = #selector(togglePopover(_:))
@@ -188,8 +182,24 @@ final class StatusItemController {
         }
     }
 
+    /// A brand-new hosting controller wrapping the editor. Rebuilt on every
+    /// show: a popover re-open does NOT re-run the SwiftUI view's onAppear
+    /// (the view stays mounted, the window is merely hidden), so @State like
+    /// showSettings would otherwise survive — landing on the Preferences
+    /// page again. A fresh controller forgets everything.
+    private func makeContentController() -> NSViewController {
+        NSHostingController(
+            rootView: EditorPopover(
+                monitor: monitor, store: store, updater: updater,
+                onJump: { [weak self] in
+                    self?.popover.performClose(nil)
+                })
+        )
+    }
+
     private func showPopover() {
         guard let button = statusItem.button, !popover.isShown else { return }
+        popover.contentViewController = makeContentController()
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         popover.contentViewController?.view.window?.makeKey()
     }

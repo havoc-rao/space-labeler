@@ -92,7 +92,7 @@ rm ~/Library/LaunchAgents/com.jeremywatt.SpaceLabeler.plist
 
 更新检查优先读取 release workflow 提交到仓库 `main` 分支的小型 `latest.json`（版本号 + 直链下载地址 + SHA-256），不经 GitHub API、不限流，并在安装前用 SHA-256 校验下载的 zip；若 `latest.json` 不存在则回退到 GitHub releases API。
 
-注意：每次构建都是新的 ad-hoc 签名，macOS 可能因此重置辅助功能授权——更新后应用重启时会自动重新请求辅助功能权限，在弹出的授权窗口中允许即可；若更新后跳转（Ctrl+N）仍失效，请到「系统设置 → 隐私与安全性 → 辅助功能」重新开启 Space Labeler；若开关卡住无法开启，请用「偏好设置 → 环境自检 → 清理旧的辅助功能权限记录」（该操作会重启应用）。更新源仓库在 `Sources/Updater.swift` 的 `UpdaterConfig.repo` 中配置，仓库迁移时只需改这一处。
+注意：每次构建都是新的 ad-hoc 签名，macOS 可能因此重置辅助功能授权——更新后应用重启时会自动重新请求辅助功能权限，在弹出的授权窗口中允许即可；若更新后跳转（Ctrl+N）仍失效，请到「系统设置 → 隐私与安全性 → 辅助功能」重新开启 Space Labeler；若开关卡住无法开启，请用「偏好设置 → 环境自检 → 清理旧的辅助功能权限记录」（该操作会重启应用）。更新源仓库在 `Sources/Components/Updater.swift` 的 `UpdaterConfig.repo` 中配置，仓库迁移时只需改这一处。
 
 ## 开发
 
@@ -128,7 +128,7 @@ git push origin v0.2.0
 
 ## 关于私有 API 的说明
 
-`Sources/SkyLight.swift` 在运行时通过 `dlsym` 解析以下未文档化的 CoreGraphics 符号：
+`Sources/Components/SkyLight.swift` 在运行时通过 `dlsym` 解析以下未文档化的 CoreGraphics 符号：
 
 - `CGSMainConnectionID` — 窗口服务器的连接 ID
 - `CGSGetActiveSpace` — 当前激活的 Space ID

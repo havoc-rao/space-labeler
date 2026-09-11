@@ -92,7 +92,7 @@ On launch the app silently checks for a new release (at most once per day). Open
 
 The check reads a small `latest.json` (version + direct zip URL + SHA-256) committed to the repo's `main` branch by the release workflow — no GitHub API rate limit — and verifies the downloaded zip against that SHA-256 before installing. If `latest.json` is absent it falls back to the GitHub releases API.
 
-Note: every build carries a fresh ad-hoc signature, so macOS may reset the Accessibility grant — after the update restarts the app it automatically re-requests the permission, just approve the prompt. If jumping (Ctrl+N) still stops working after an update, re-enable Space Labeler in System Settings → Privacy & Security → Accessibility. If the toggle is stuck, use Preferences → STATUS → **Clean stale Accessibility records** instead (that flow restarts the app). The update source repo is configured in one constant, `UpdaterConfig.repo` in `Sources/Updater.swift`, so it's easy to change if the repository moves.
+Note: every build carries a fresh ad-hoc signature, so macOS may reset the Accessibility grant — after the update restarts the app it automatically re-requests the permission, just approve the prompt. If jumping (Ctrl+N) still stops working after an update, re-enable Space Labeler in System Settings → Privacy & Security → Accessibility. If the toggle is stuck, use Preferences → STATUS → **Clean stale Accessibility records** instead (that flow restarts the app). The update source repo is configured in one constant, `UpdaterConfig.repo` in `Sources/Components/Updater.swift`, so it's easy to change if the repository moves.
 
 ## Development
 
@@ -128,7 +128,7 @@ git push origin v0.2.0
 
 ## Notes on the private API
 
-`Sources/SkyLight.swift` resolves a handful of undocumented CoreGraphics symbols at runtime via `dlsym`:
+`Sources/Components/SkyLight.swift` resolves a handful of undocumented CoreGraphics symbols at runtime via `dlsym`:
 
 - `CGSMainConnectionID` — connection ID for the window server
 - `CGSGetActiveSpace` — the currently-active Space ID

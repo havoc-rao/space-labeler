@@ -38,6 +38,14 @@ That generates the Xcode project, builds a Release binary, copies it to `~/Appli
 
 ### Launch at login (optional)
 
+Move the app into `/Applications` or `~/Applications`, then open the menu bar popover → **Preferences…** → enable **Launch at login**. This starts the app after you log in to macOS, not before login. It is off by default and never registers automatically on app launch.
+
+- Properly signed builds register with `SMAppService.mainApp`. If approval is required, click **Allow in System Settings…** and allow Space Labeler under General → Login Items (or Login Items & Extensions). Returning to the app or clicking Refresh re-reads the system status.
+- Current ad-hoc builds use the same user LaunchAgent as the legacy script. The UI reports **configured**, not **approved**: it cannot verify system approval for this mechanism, so use **Login Item Settings…** to check. The toggle does not immediately load the agent, avoiding a second app instance; it takes effect at the next login. Do not move or delete the app afterwards. If you move it, turn the toggle off and back on to update the launch path.
+- Turning the toggle off unregisters the service or removes its LaunchAgent configuration without quitting the running app. Independently added system login items must be removed separately. The app does not override a system disable decision.
+
+The legacy command-line installer remains available (it immediately restarts the app):
+
 ```sh
 make install-login
 ```
@@ -49,7 +57,7 @@ launchctl unload ~/Library/LaunchAgents/com.jeremywatt.SpaceLabeler.plist
 rm ~/Library/LaunchAgents/com.jeremywatt.SpaceLabeler.plist
 ```
 
-Without `install-login`, the app does **not** auto-launch at login — relaunch it after reboot via `Cmd+Space` → "Space Labeler" → `Enter`.
+Without enabling the in-app toggle, running `install-login`, or manually adding a system login item, the app does **not** auto-launch at login — relaunch it after reboot via `Cmd+Space` → "Space Labeler" → `Enter`.
 
 ### Why a LaunchAgent instead of `SMAppService`?
 

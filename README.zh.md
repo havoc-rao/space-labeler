@@ -38,6 +38,14 @@ make install
 
 ### 开机自启（可选）
 
+先把应用移到 `/Applications` 或 `~/Applications`，打开菜单栏面板 → **偏好设置…** → 开启 **登录时自动启动**。此功能在用户登录 macOS 后启动应用，而不是登录前启动系统服务；默认关闭，不会在应用启动时自动申请。
+
+- 正式签名版本通过 `SMAppService.mainApp` 注册系统登录项。如显示「等待系统授权」，点击 **前往系统设置授权…**，在「通用 → 登录项（或登录项与扩展）」中允许 Space Labeler。返回应用或点击「刷新」会重新读取状态。
+- 当前 ad-hoc 版本使用与旧脚本相同的用户级 LaunchAgent，界面显示「已配置」而非「已授权」：应用无法读取这一方式的系统批准状态，请通过 **打开登录项设置…** 检查。开关不立即加载 LaunchAgent，避免启动第二份实例，配置从下次登录生效。请勿移动或删除应用，否则启动路径失效；移动后关闭并重新开启该开关即可更新路径。
+- 关闭开关会撤销注册或移除该 LaunchAgent 配置，但不会退出当前应用。系统中另行手动添加的登录项需要自行移除；不会自动绕过系统禁用。
+
+兼容原有命令行安装方式（会立即重启应用）：
+
 ```sh
 make install-login
 ```
@@ -49,7 +57,7 @@ launchctl unload ~/Library/LaunchAgents/com.jeremywatt.SpaceLabeler.plist
 rm ~/Library/LaunchAgents/com.jeremywatt.SpaceLabeler.plist
 ```
 
-如果未执行 `install-login`，应用**不会**随登录自动启动——重启后需通过 `Cmd+Space` → "Space Labeler" → `Enter` 手动启动。
+如果既未开启应用内开关，也未执行 `install-login` 或手动添加系统登录项，应用**不会**随登录自动启动——重启后需通过 `Cmd+Space` → "Space Labeler" → `Enter` 手动启动。
 
 ### 为什么用 LaunchAgent 而不是 `SMAppService`？
 

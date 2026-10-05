@@ -6,6 +6,7 @@ import SwiftUI
 struct SettingsView: View {
     /// Update checks and the download-and-restart flow.
     @ObservedObject var updater: UpdaterState
+    @ObservedObject private var loginItem = LoginItemManager.shared
 
     /// Called when the user navigates back to the main popover.
     var onDone: () -> Void
@@ -31,16 +32,22 @@ struct SettingsView: View {
 
             Divider()
 
-            languageSection
-            updateSection
-            statusSection
-
-            Spacer(minLength: 0)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    languageSection
+                    loginItemSection
+                    updateSection
+                    statusSection
+                }
+            }
         }
         .padding(13)
         .frame(width: 290, height: 450)
         .onAppear { refreshStatus() }
         .onChange(of: languageRaw) { _ in refreshStatus() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            refreshStatus()
+        }
     }
 
     /// Re-reads the Accessibility trust state and the system's enabled
@@ -49,6 +56,7 @@ struct SettingsView: View {
     private func refreshStatus() {
         axTrusted = SkyLight.isAccessibilityTrusted
         digits = SkyLight.enabledDesktopShortcuts()
+        loginItem.refresh()
     }
 
     /// "1, 2, 3, 4" or the localized no-digits message.
@@ -102,6 +110,64 @@ struct SettingsView: View {
             RoundedRectangle(cornerRadius: 8)
                 .fill(Color.white.opacity(0.055))
         )
+    }
+
+    private var loginItemSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Toggle(
+                L10n.t("settings.launchAtLogin"),
+                isOn: Binding(
+                    get: { loginItem.isEnabled },
+                    set: { loginItem.setEnabled($0) }
+                )
+            )
+            .toggleStyle(.switch)
+            .font(.system(size: 12))
+
+            Text(loginItemStatusText)
+                .font(.system(size: 11))
+                .foregroundStyle(loginItem.status == .requiresApproval ? Color.orange : Color.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if let message = loginItem.errorMessage {
+                Text(L10n.t("settings.loginItemFailed", message))
+                    .font(.system(size: 11))
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            HStack {
+                Button(
+                    L10n.t(
+                        loginItem.status == .requiresApproval
+                            ? "settings.approveLoginItem" : "settings.loginItemSettings")
+                ) {
+                    loginItem.openSystemSettings()
+                }
+                .buttonStyle(.bordered)
+                .font(.system(size: 11))
+                Spacer()
+                Button(L10n.t("settings.refresh")) { loginItem.refresh() }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(11)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.white.opacity(0.055))
+        )
+    }
+
+    private var loginItemStatusText: String {
+        switch loginItem.status {
+        case .notRegistered: return L10n.t("settings.loginItemOff")
+        case .enabled: return L10n.t("settings.loginItemEnabled")
+        case .requiresApproval: return L10n.t("settings.loginItemApproval")
+        case .notFound: return L10n.t("settings.loginItemNotFound")
+        case .legacyConfigured: return L10n.t("settings.loginItemLegacy")
+        }
     }
 
     /// Checks GitHub Releases for a newer build, offers Download & Restart.

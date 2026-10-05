@@ -40,6 +40,14 @@ enum L10n {
     }
 
     private static let enTable: [String: String] = [
+        "loginItem.foreignPlist":
+            "The existing login LaunchAgent is not the configuration created by SpaceLabeler. It was left unchanged.",
+        "loginItem.missingExecutable":
+            "The SpaceLabeler executable could not be found. Install the application before enabling login launch.",
+        "loginItem.unsafePath":
+            "The login LaunchAgent path is not a regular user-owned file/directory. It was left unchanged.",
+        "loginItem.signatureError": "Unable to inspect the application signature (Security error %d).",
+        "loginItem.changedPlist": "The login LaunchAgent changed before removal. It was left unchanged.",
         // EditorPopover
         "section.current": "Current Space",
         "section.all": "All Spaces",
@@ -116,6 +124,19 @@ enum L10n {
         "settings.title": "SETTINGS",
         "settings.language": "Language",
 
+        // Login items (SettingsView)
+        "settings.launchAtLogin": "Launch at login",
+        "settings.loginItemOff": "Off — Space Labeler will not request automatic launch.",
+        "settings.loginItemEnabled": "Enabled — launches when you log in to macOS.",
+        "settings.loginItemApproval":
+            "Approval required. Allow Space Labeler in System Settings → General → Login Items (or Login Items & Extensions).",
+        "settings.loginItemNotFound": "Login item unavailable. Move the app to Applications and try again.",
+        "settings.loginItemLegacy":
+            "Configured for next login via LaunchAgent. This ad-hoc build cannot verify system approval; check that Space Labeler is allowed in Login Items. Turning this off leaves the current app running.",
+        "settings.loginItemFailed": "Could not change login item: %@",
+        "settings.approveLoginItem": "Allow in System Settings…",
+        "settings.loginItemSettings": "Login Item Settings…",
+
         // Updates (SettingsView)
         "settings.updates": "UPDATES",
         "settings.currentVersion": "Current version",
@@ -135,6 +156,11 @@ enum L10n {
     ]
 
     private static let zhTable: [String: String] = [
+        "loginItem.foreignPlist": "现有登录 LaunchAgent 不是 SpaceLabeler 创建的配置，已保留原文件。",
+        "loginItem.missingExecutable": "找不到 SpaceLabeler 可执行文件。请先安装应用，再开启登录启动。",
+        "loginItem.unsafePath": "登录 LaunchAgent 路径不是当前用户拥有的普通文件或目录，已保留原文件。",
+        "loginItem.signatureError": "无法检查应用签名（Security 错误 %d）。",
+        "loginItem.changedPlist": "登录 LaunchAgent 在移除前已被更改，已保留原文件。",
         // EditorPopover
         "section.current": "当前 Space",
         "section.all": "所有 Space",
@@ -202,6 +228,18 @@ enum L10n {
         "settings.back": "返回",
         "settings.title": "设置",
         "settings.language": "语言",
+
+        // 登录项（SettingsView）
+        "settings.launchAtLogin": "登录时自动启动",
+        "settings.loginItemOff": "已关闭 — 应用不会请求随登录自动启动。",
+        "settings.loginItemEnabled": "已启用 — 登录 macOS 时自动启动。",
+        "settings.loginItemApproval": "等待系统授权。请在「系统设置 → 通用 → 登录项（或登录项与扩展）」中允许 Space Labeler。",
+        "settings.loginItemNotFound": "登录项不可用，请将应用移入 Applications 后重试。",
+        "settings.loginItemLegacy":
+            "已通过 LaunchAgent 配置下次登录启动。当前 ad-hoc 版本无法确认系统授权，请在「登录项」中检查是否允许 Space Labeler。关闭此项不会退出当前应用。",
+        "settings.loginItemFailed": "无法修改登录启动设置：%@",
+        "settings.approveLoginItem": "前往系统设置授权…",
+        "settings.loginItemSettings": "打开登录项设置…",
 
         // Updates (SettingsView)
         "settings.updates": "更新",
